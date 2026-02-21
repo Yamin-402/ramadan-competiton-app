@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { AppError } from "../../core/errors/app-error.js";
 import { authRepository } from "./auth.repository.js";
 
-const INITIAL_USER_POINTS = 10;
+const INITIAL_USER_POINTS = 100
 
 function toSessionUser(user) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
