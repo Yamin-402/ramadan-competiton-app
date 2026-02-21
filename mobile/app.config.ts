@@ -9,10 +9,18 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   assetBundlePatterns: ["**/*"],
+  icon: "./assets/images/icon.png",
   ios: {
     supportsTablet: true,
+    bundleIdentifier: "com.yamin.ramadancompetition",
   },
-  android: {},
+  android: {
+    package: "com.yamin.ramadancompetition",
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/adaptive-icon.png",
+      backgroundColor: "#0F3A2C",
+    },
+  },
   web: {
     bundler: "metro",
   },
