@@ -1,0 +1,11 @@
+we could close the admin panel for now, let's go to the user interface, where the real thingss starts there
+
+there are many logica bugs that needs to be solved, but i want now to focus on the design then we go to the logic
+
+the design is good, but i think that it could be enhanced alot more, so, i want you to build a new 2 task pages with same functions for now, that have different designs, make one with ramadan modern theme, and other with modern new theme only, while keeping the current one in case we wanted to return to it.
+
+finally, in the top nav ( which contains the notification bell) add the user points and the day of ramadan, where ramdan starts on 19/2, and put some suitable images/icons ( images are prefered ) on the lower nav bar, instead of the current icons above the page name 
+
+------
+
+dude, chill, every variant means to change everything, even the background, please retry, put keep other changes you made, i liked it in some variants and another

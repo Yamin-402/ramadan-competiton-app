@@ -1,0 +1,34 @@
+import { NavigatorScreenParams } from "@react-navigation/native";
+
+export type RootStackParamList = {
+  Auth: undefined;
+  Main: NavigatorScreenParams<MainTabParamList>;
+};
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+};
+
+export type MainTabParamList = {
+  TasksTab: undefined;
+  ForbiddenTab: undefined;
+  DailyQuestionsTab: undefined;
+  MoreTab: NavigatorScreenParams<MoreStackParamList>;
+};
+
+export type MoreStackParamList = {
+  MoreMenu: undefined;
+  Leaderboard: undefined;
+  Streaks: undefined;
+  Notifications: undefined;
+  Money: undefined;
+  ActivityStats: undefined;
+  ActivityHistory: undefined;
+  Profile: undefined;
+  UserProfile: {
+    userId: number;
+    fallbackDisplayName: string | null;
+    fallbackEmail: string;
+  };
+};

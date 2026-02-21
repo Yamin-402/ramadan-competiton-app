@@ -1,0 +1,31 @@
+{
+  "name": "ramadan-express-prisma",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "admin:dev": "npm --prefix admin-web run dev -- --host",
+    "admin:build": "npm --prefix admin-web run build",
+    "admin:typecheck": "npm --prefix admin-web run typecheck",
+    "user:promote-admin": "node scripts/promote-admin.js",
+    "streak:self-check": "node scripts/streak-self-check.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:validate": "prisma validate",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "prisma": "^5.19.1"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "ramadan-competition-mobile": "file:.."
+  }
+}
