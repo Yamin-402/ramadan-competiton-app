@@ -20,8 +20,28 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
+  console.log(`[API] -> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log(`[API] <- ${response.status} ${response.config.url}`);
+    return response;
+  },
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      console.error(`[API] Error: ${error.message}`, {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+    }
+    return Promise.reject(error);
+  }
+);
 
 export async function unwrapData<T>(
   request: Promise<AxiosResponse<ApiEnvelope<T>>>
@@ -54,6 +74,13 @@ export function getApiErrorMessage(error: unknown, fallback = "Request failed"):
       return "Server error. Please try again later.";
     }
     if (!apiError.response) {
+      // More specific error messages for different cases
+      if (apiError.code === "ECONNABORTED") {
+        return "Request timeout. Server is not responding.";
+      }
+      if (apiError.code === "ERR_NETWORK") {
+        return "Network error. Cannot reach the server.";
+      }
       return "Network error. Please check your connection.";
     }
 

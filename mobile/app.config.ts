@@ -24,7 +24,12 @@ const config: ExpoConfig = {
   web: {
     bundler: "metro",
   },
-  extra: apiBaseUrl ? { apiBaseUrl } : {},
+  extra: {
+    ...(apiBaseUrl ? { apiBaseUrl } : {}),
+    eas: {
+      projectId: "232e9bf1-4067-4fd1-a7e3-25ff8884c5d9",
+    },
+  },
 };
 
 export default config;

@@ -1,7 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { User } from "../types/domain";
+import { createStorage } from "../utils/web-storage";
 
 interface AuthState {
   token: string | null;
@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "ramadan-auth",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createStorage()),
       partialize: (state) => ({
         token: state.token,
         user: state.user,

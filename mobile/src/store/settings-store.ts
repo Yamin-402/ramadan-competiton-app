@@ -1,6 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { createStorage } from "../utils/web-storage";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type TasksDesignVariant = "classic" | "ramadan_modern" | "modern";
@@ -39,7 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "ramadan-settings",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createStorage()),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);
       },
