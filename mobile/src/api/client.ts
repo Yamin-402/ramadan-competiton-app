@@ -1,15 +1,18 @@
 import axios, { AxiosError, AxiosResponse } from "axios";
-import { API_BASE_URL } from "../config/env";
+import { API_BASE_URL, API_BASE_URL_FALLBACKS } from "../config/env";
 import { useAuthStore } from "../store/auth-store";
 import { ApiEnvelope, ApiErrorEnvelope } from "../types/api";
 
+let activeApiBaseUrl = API_BASE_URL;
+
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: activeApiBaseUrl,
   timeout: 20000,
 });
 
 apiClient.interceptors.request.use((config) => {
   const { token, user } = useAuthStore.getState();
+  config.baseURL = activeApiBaseUrl;
 
   if (user?.id) {
     config.headers["x-user-id"] = String(user.id);
@@ -30,6 +33,24 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (axios.isAxiosError(error)) {
+      const config = error.config as (typeof error.config & { __fallbackRetried?: boolean }) | undefined;
+      const isNetworkError = !error.response;
+      if (isNetworkError && config && !config.__fallbackRetried) {
+        const currentBase = config.baseURL || activeApiBaseUrl;
+        const fallbackBase = API_BASE_URL_FALLBACKS.find((url) => url !== currentBase);
+        if (fallbackBase) {
+          activeApiBaseUrl = fallbackBase;
+          config.baseURL = fallbackBase;
+          config.__fallbackRetried = true;
+          console.warn(
+            `[API] Network error on ${currentBase}. Retrying once with fallback ${fallbackBase}.`
+          );
+          return apiClient.request(config);
+        }
+      }
+    }
+
     if (axios.isAxiosError(error)) {
       console.error(`[API] Error: ${error.message}`, {
         url: error.config?.url,

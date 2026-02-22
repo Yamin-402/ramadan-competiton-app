@@ -1,6 +1,6 @@
 # Ramadan Admin Panel
 
-Web admin panel for backend routes under `/api/v1/admin`.
+Web admin panel for backend routes under `/admin`.
 
 ## Setup
 

@@ -775,7 +775,6 @@ export const adminRepository = {
       prisma.user.findMany({
         where: {
           isActive: true,
-          role: "USER",
         },
         select: {
           id: true,

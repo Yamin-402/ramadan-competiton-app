@@ -5,9 +5,8 @@ export const publicApi = {
   listTags(includeInactive = true) {
     return requestData<Tag[]>({
       method: "GET",
-      url: "/api/v1/tags",
+      url: "/tags",
       params: { includeInactive },
     });
   },
 };
-

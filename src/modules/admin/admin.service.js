@@ -509,10 +509,6 @@ export const adminService = {
       throw new AppError(409, "User is not active");
     }
 
-    if (user.role !== "USER") {
-      throw new AppError(400, "Only regular users can be shown on leaderboard");
-    }
-
     const updated = await adminRepository.updateUserLeaderboardVisibility(userId, isVisible);
 
     await adminRepository.createAdminActionLog({

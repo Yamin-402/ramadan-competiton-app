@@ -1,7 +1,7 @@
 import { PropsWithChildren, ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { NavigationProp, ParamListBase, useNavigation } from "@react-navigation/native";
-import { Edge, SafeAreaView } from "react-native-safe-area-context";
+import { Edge, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "../hooks/use-app-theme";
 import { useSettingsStore } from "../store/settings-store";
 import { PatternBackground } from "./PatternBackground";
@@ -29,6 +29,7 @@ export function ScreenContainer({
   overlayTopSpacing = 0,
 }: ScreenContainerProps) {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const variant = useSettingsStore((state) => state.tasksDesignVariant);
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const hasTabParent = (() => {
@@ -43,6 +44,8 @@ export function ScreenContainer({
   })();
   const applyTabBarSpacing = withTabBarSpacing ?? hasTabParent;
   const contentPaddingTop = BASE_CONTENT_PADDING + Math.max(0, overlayTopSpacing);
+  const contentPaddingBottom =
+    BASE_CONTENT_PADDING + (applyTabBarSpacing ? Math.max(insets.bottom, 8) : 0);
 
   return (
     <View style={styles.root}>
@@ -54,7 +57,7 @@ export function ScreenContainer({
             contentContainerStyle={[
               styles.content,
               { paddingTop: contentPaddingTop },
-              applyTabBarSpacing ? styles.contentWithTabBarSpacing : null,
+              { paddingBottom: contentPaddingBottom },
             ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -66,7 +69,7 @@ export function ScreenContainer({
             style={[
               styles.content,
               { paddingTop: contentPaddingTop },
-              applyTabBarSpacing ? styles.contentWithTabBarSpacing : null,
+              { paddingBottom: contentPaddingBottom },
             ]}
           >
             {children}
@@ -88,9 +91,6 @@ const styles = StyleSheet.create({
   content: {
     padding: BASE_CONTENT_PADDING,
     gap: 12,
-  },
-  contentWithTabBarSpacing: {
-    paddingBottom: 98,
   },
   fixedOverlay: {
     ...StyleSheet.absoluteFillObject,

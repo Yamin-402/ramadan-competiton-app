@@ -21,7 +21,7 @@ export const adminApi = {
   }) {
     return requestData<AdminTask[]>({
       method: "GET",
-      url: "/api/v1/admin/tasks",
+      url: "/admin/tasks",
       params,
     });
   },
@@ -29,7 +29,7 @@ export const adminApi = {
   createTask(payload: TaskCreatePayload) {
     return requestData<AdminTask>({
       method: "POST",
-      url: "/api/v1/admin/tasks",
+      url: "/admin/tasks",
       data: payload,
     });
   },
@@ -51,7 +51,7 @@ export const adminApi = {
   ) {
     return requestData<AdminTask>({
       method: "PATCH",
-      url: `/api/v1/admin/tasks/${id}`,
+      url: `/admin/tasks/${id}`,
       data: payload,
     });
   },
@@ -59,14 +59,14 @@ export const adminApi = {
   deleteTask(id: number) {
     return requestData<{ id: number; key: string; title: string }>({
       method: "DELETE",
-      url: `/api/v1/admin/tasks/${id}`,
+      url: `/admin/tasks/${id}`,
     });
   },
 
   listCounters(params?: { includeInactive?: boolean; limit?: number }) {
     return requestData<AdminCounter[]>({
       method: "GET",
-      url: "/api/v1/admin/counters",
+      url: "/admin/counters",
       params,
     });
   },
@@ -80,7 +80,7 @@ export const adminApi = {
   }) {
     return requestData<AdminCounter>({
       method: "POST",
-      url: "/api/v1/admin/counters",
+      url: "/admin/counters",
       data: payload,
     });
   },
@@ -88,7 +88,7 @@ export const adminApi = {
   listUsers(params?: { search?: string; limit?: number }) {
     return requestData<AdminUser[]>({
       method: "GET",
-      url: "/api/v1/admin/users",
+      url: "/admin/users",
       params,
     });
   },
@@ -96,7 +96,7 @@ export const adminApi = {
   listUserActivities(userId: number, params?: { limit?: number }) {
     return requestData<AdminUserActivity[]>({
       method: "GET",
-      url: `/api/v1/admin/users/${userId}/activities`,
+      url: `/admin/users/${userId}/activities`,
       params,
     });
   },
@@ -104,14 +104,14 @@ export const adminApi = {
   deleteUser(userId: number) {
     return requestData<AdminUser>({
       method: "DELETE",
-      url: `/api/v1/admin/users/${userId}`,
+      url: `/admin/users/${userId}`,
     });
   },
 
   setUserLeaderboardVisibility(userId: number, isVisible: boolean) {
     return requestData<AdminUser>({
       method: "PATCH",
-      url: `/api/v1/admin/users/${userId}/leaderboard-visibility`,
+      url: `/admin/users/${userId}/leaderboard-visibility`,
       data: { isVisible },
     });
   },
@@ -119,14 +119,14 @@ export const adminApi = {
   deleteUserAvatar(userId: number) {
     return requestData<AdminUser>({
       method: "DELETE",
-      url: `/api/v1/admin/users/${userId}/avatar`,
+      url: `/admin/users/${userId}/avatar`,
     });
   },
 
   listTaskCounterRules(params?: { taskId?: number; counterId?: number }) {
     return requestData<AdminTaskCounterRule[]>({
       method: "GET",
-      url: "/api/v1/admin/task-counter-rules",
+      url: "/admin/task-counter-rules",
       params,
     });
   },
@@ -139,7 +139,7 @@ export const adminApi = {
   }) {
     return requestData<AdminTaskCounterRule>({
       method: "POST",
-      url: "/api/v1/admin/task-counter-rules",
+      url: "/admin/task-counter-rules",
       data: payload,
     });
   },
@@ -147,7 +147,7 @@ export const adminApi = {
   deleteTaskCounterRule(id: number) {
     return requestData<AdminTaskCounterRule>({
       method: "DELETE",
-      url: `/api/v1/admin/task-counter-rules/${id}`,
+      url: `/admin/task-counter-rules/${id}`,
     });
   },
 
@@ -159,7 +159,7 @@ export const adminApi = {
   }) {
     return requestData({
       method: "POST",
-      url: "/api/v1/admin/points/adjustments",
+      url: "/admin/points/adjustments",
       data: payload,
     });
   },
@@ -175,7 +175,7 @@ export const adminApi = {
   }) {
     return requestData({
       method: "POST",
-      url: "/api/v1/admin/notifications/campaigns",
+      url: "/admin/notifications/campaigns",
       data: payload,
     });
   },
@@ -183,7 +183,7 @@ export const adminApi = {
   listNotificationCampaigns(limit = 100) {
     return requestData<NotificationCampaignListItem[]>({
       method: "GET",
-      url: "/api/v1/admin/notifications/campaigns",
+      url: "/admin/notifications/campaigns",
       params: { limit },
     });
   },
@@ -191,7 +191,7 @@ export const adminApi = {
   deleteNotificationCampaign(id: number) {
     return requestData<{ id: number; title: string }>({
       method: "DELETE",
-      url: `/api/v1/admin/notifications/campaigns/${id}`,
+      url: `/admin/notifications/campaigns/${id}`,
     });
   },
 
@@ -206,7 +206,7 @@ export const adminApi = {
   }) {
     return requestData({
       method: "POST",
-      url: "/api/v1/admin/daily-questions",
+      url: "/admin/daily-questions",
       data: payload,
     });
   },
@@ -214,7 +214,7 @@ export const adminApi = {
   listDailyQuestions(limit = 50) {
     return requestData<DailyQuestionListItem[]>({
       method: "GET",
-      url: "/api/v1/admin/daily-questions",
+      url: "/admin/daily-questions",
       params: { limit },
     });
   },
@@ -233,7 +233,7 @@ export const adminApi = {
   ) {
     return requestData({
       method: "PATCH",
-      url: `/api/v1/admin/daily-questions/${id}`,
+      url: `/admin/daily-questions/${id}`,
       data: payload,
     });
   },
@@ -241,14 +241,14 @@ export const adminApi = {
   deleteDailyQuestion(id: number) {
     return requestData<{ id: number; questionText: string; activeDate: string }>({
       method: "DELETE",
-      url: `/api/v1/admin/daily-questions/${id}`,
+      url: `/admin/daily-questions/${id}`,
     });
   },
 
   listDailyQuestionAnswers(id: number, limit = 200) {
     return requestData<AdminDailyQuestionAnswer[]>({
       method: "GET",
-      url: `/api/v1/admin/daily-questions/${id}/answers`,
+      url: `/admin/daily-questions/${id}/answers`,
       params: { limit },
     });
   },
@@ -262,7 +262,7 @@ export const adminApi = {
   ) {
     return requestData<AdminDailyQuestionAnswer>({
       method: "PATCH",
-      url: `/api/v1/admin/daily-questions/answers/${answerId}/review`,
+      url: `/admin/daily-questions/answers/${answerId}/review`,
       data: payload,
     });
   },
@@ -274,14 +274,14 @@ export const adminApi = {
       revealedCount: number;
     }>({
       method: "POST",
-      url: "/api/v1/admin/daily-questions/reveal",
+      url: "/admin/daily-questions/reveal",
     });
   },
 
   getLeaderboard(limit = 100) {
     return requestData<LeaderboardRow[]>({
       method: "GET",
-      url: "/api/v1/admin/leaderboard",
+      url: "/admin/leaderboard",
       params: { limit },
     });
   },
