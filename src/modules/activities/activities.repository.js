@@ -78,6 +78,104 @@ export const activitiesRepository = {
       }));
   },
 
+  listConditionalTasksByChildTaskId(childTaskId) {
+    return prisma.task.findMany({
+      where: {
+        status: "ACTIVE",
+        type: "CONDITIONAL",
+      },
+      include: taskInclude,
+    }).then((rows) =>
+      rows.filter((row) => {
+        const config = row.config;
+        if (!config || typeof config !== "object" || Array.isArray(config)) {
+          return false;
+        }
+
+        const childIds = Array.isArray(config.conditionalChildTaskIds)
+          ? config.conditionalChildTaskIds
+              .map((value) => Number(value))
+              .filter((value) => Number.isInteger(value) && value > 0)
+          : [];
+
+        return childIds.includes(childTaskId);
+      })
+    );
+  },
+
+  async listDistinctCompletedTaskIdsInWindow({ userId, taskIds, startAt, endAt }) {
+    const rows = await prisma.activity.findMany({
+      where: {
+        userId,
+        type: "TASK_COMPLETION",
+        taskId: { in: taskIds },
+        occurredAt: {
+          gte: startAt,
+          lt: endAt,
+        },
+      },
+      select: {
+        taskId: true,
+      },
+      distinct: ["taskId"],
+    });
+
+    return rows
+      .map((row) => row.taskId)
+      .filter((taskId) => typeof taskId === "number");
+  },
+
+  findSystemActivityByNote({ userId, taskId, note }) {
+    return prisma.activity.findFirst({
+      where: {
+        userId,
+        taskId,
+        type: "SYSTEM",
+        note,
+      },
+      select: {
+        id: true,
+      },
+    });
+  },
+
+  async sumSystemActivityPointsByNotePrefix({ userId, taskId, notePrefix }) {
+    const result = await prisma.activity.aggregate({
+      where: {
+        userId,
+        taskId,
+        type: "SYSTEM",
+        note: {
+          startsWith: notePrefix,
+        },
+      },
+      _sum: {
+        effectivePoints: true,
+      },
+    });
+
+    return Number(result._sum.effectivePoints || 0);
+  },
+
+  createSystemActivity(payload) {
+    return prisma.activity.create({
+      data: {
+        userId: payload.userId,
+        taskId: payload.taskId,
+        type: "SYSTEM",
+        occurredAt: payload.occurredAt,
+        timezone: payload.timezone,
+        isDuringFasting: payload.isDuringFasting,
+        fastingMultiplier: payload.fastingMultiplier,
+        basePoints: payload.basePoints,
+        effectivePoints: payload.effectivePoints,
+        note: payload.note,
+        metadata: payload.metadata,
+        isForbidden: false,
+      },
+    });
+  },
+
   async sumCounterTotal({ userId, counterId }) {
     const result = await prisma.activityCounterDelta.aggregate({
       where: {

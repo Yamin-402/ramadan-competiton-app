@@ -20,6 +20,7 @@ type AudienceType =
   | "SCHOOL_EGYPTIAN"
   | "SCHOOL_FOREIGN";
 type CompletionPolicy = "SINGLE" | "MULTIPLE_LIMITED" | "MULTIPLE_UNLIMITED";
+type StreakBonusMode = "ONE_TIME" | "RECURRING_SAME" | "RECURRING_CUSTOM";
 
 interface TaskFormState {
   title: string;
@@ -30,6 +31,10 @@ interface TaskFormState {
   flow: FlowType;
   audience: AudienceType;
   streakEnabled: boolean;
+  streakGoalDays: string;
+  streakBonusPoints: string;
+  streakBonusMode: StreakBonusMode;
+  streakRepeatEveryDays: string;
   completionPolicy: CompletionPolicy;
   completionLimit: string;
   active: boolean;
@@ -42,6 +47,11 @@ interface TaskFormState {
   conditionEnabled: boolean;
   conditionTargetTaskId: string;
   conditionValue: string;
+  conditionalChildTaskIds: string[];
+  conditionalPartialCount: string;
+  conditionalPartialPoints: string;
+  conditionalPartialRequiredTaskIds: string[];
+  conditionalFullPoints: string;
 }
 
 const defaultForm: TaskFormState = {
@@ -53,6 +63,10 @@ const defaultForm: TaskFormState = {
   flow: "NORMAL",
   audience: "ALL",
   streakEnabled: false,
+  streakGoalDays: "7",
+  streakBonusPoints: "0",
+  streakBonusMode: "ONE_TIME",
+  streakRepeatEveryDays: "7",
   completionPolicy: "SINGLE",
   completionLimit: "2",
   active: true,
@@ -65,6 +79,11 @@ const defaultForm: TaskFormState = {
   conditionEnabled: false,
   conditionTargetTaskId: "",
   conditionValue: "1",
+  conditionalChildTaskIds: [],
+  conditionalPartialCount: "",
+  conditionalPartialPoints: "",
+  conditionalPartialRequiredTaskIds: [],
+  conditionalFullPoints: "",
 };
 
 function normalizeKey(text: string): string {
@@ -208,6 +227,16 @@ function completionLimitFromTask(task: AdminTask): string {
   return "2";
 }
 
+function streakBonusModeFromTask(task: AdminTask): StreakBonusMode {
+  const raw = typeof task.config?.streakBonusMode === "string"
+    ? task.config.streakBonusMode.toUpperCase()
+    : "";
+  if (raw === "RECURRING_SAME" || raw === "RECURRING_CUSTOM") {
+    return raw;
+  }
+  return "ONE_TIME";
+}
+
 export function TasksModule({ tasks, counters, tags, onRefreshReferences }: TasksModuleProps) {
   const [form, setForm] = useState<TaskFormState>(defaultForm);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
@@ -236,11 +265,66 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
       flow: flowFromTask(task),
       audience: audienceFromTask(task),
       streakEnabled: isStreakEnabled(task),
+      streakGoalDays: String(task.config?.streakGoalDays ?? 7),
+      streakBonusPoints: String(task.config?.streakBonusPoints ?? 0),
+      streakBonusMode: streakBonusModeFromTask(task),
+      streakRepeatEveryDays: String(task.config?.streakRepeatEveryDays ?? task.config?.streakGoalDays ?? 7),
       completionPolicy: completionPolicyFromTask(task),
       completionLimit: completionLimitFromTask(task),
       active: task.status === "ACTIVE",
       startsAt: task.startsAt ? new Date(task.startsAt).toISOString() : "",
       endsAt: task.endsAt ? new Date(task.endsAt).toISOString() : "",
+      conditionalChildTaskIds: Array.isArray(task.config?.conditionalChildTaskIds)
+        ? task.config.conditionalChildTaskIds.map((value) => String(value))
+        : [],
+      conditionalPartialCount: Array.isArray(task.config?.conditionalRewardTiers)
+        ? String(
+            task.config.conditionalRewardTiers
+              .map((tier) => Number((tier as { requiredCount?: unknown }).requiredCount))
+              .filter((value) => Number.isFinite(value))
+              .sort((a, b) => a - b)[0] || ""
+          )
+        : "",
+      conditionalPartialPoints: Array.isArray(task.config?.conditionalRewardTiers)
+        ? String(
+            task.config.conditionalRewardTiers
+              .map((tier) => ({
+                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+                points: Number((tier as { points?: unknown }).points),
+                requiredTaskIds: Array.isArray((tier as { requiredTaskIds?: unknown }).requiredTaskIds)
+                  ? (tier as { requiredTaskIds?: unknown[] }).requiredTaskIds
+                      ?.map((value) => String(value))
+                      .filter(Boolean) || []
+                  : [],
+              }))
+              .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
+              .sort((a, b) => a.requiredCount - b.requiredCount)[0]?.points ?? ""
+          )
+        : "",
+      conditionalPartialRequiredTaskIds: Array.isArray(task.config?.conditionalRewardTiers)
+        ? (() => {
+            const firstTier = task.config.conditionalRewardTiers
+              .map((tier) => ({
+                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+                requiredTaskIds: Array.isArray((tier as { requiredTaskIds?: unknown }).requiredTaskIds)
+                  ? (tier as { requiredTaskIds?: unknown[] }).requiredTaskIds
+                      ?.map((value) => String(value))
+                      .filter(Boolean) || []
+                  : [],
+              }))
+              .filter((tier) => Number.isFinite(tier.requiredCount))
+              .sort((a, b) => a.requiredCount - b.requiredCount)[0];
+            return firstTier?.requiredTaskIds || [];
+          })()
+        : [],
+      conditionalFullPoints: Array.isArray(task.config?.conditionalRewardTiers)
+        ? String(
+            task.config.conditionalRewardTiers
+              .map((tier) => Number((tier as { points?: unknown }).points))
+              .filter((value) => Number.isFinite(value))
+              .sort((a, b) => b - a)[0] ?? ""
+          )
+        : "",
     });
     setEditingTaskId(task.id);
     setError(null);
@@ -264,10 +348,33 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         throw new Error("Points must be numeric.");
       }
 
+      if (form.streakEnabled) {
+        const streakGoalDays = Number(form.streakGoalDays);
+        const streakBonusPoints = Number(form.streakBonusPoints);
+        if (!Number.isFinite(streakGoalDays) || streakGoalDays <= 0) {
+          throw new Error("Streak goal days must be greater than 0.");
+        }
+        if (!Number.isFinite(streakBonusPoints) || streakBonusPoints <= 0) {
+          throw new Error("Streak bonus points must be greater than 0.");
+        }
+        if (form.streakBonusMode === "RECURRING_CUSTOM") {
+          const repeatEvery = Number(form.streakRepeatEveryDays);
+          if (!Number.isFinite(repeatEvery) || repeatEvery <= 0) {
+            throw new Error("Custom streak repeat days must be greater than 0.");
+          }
+        }
+      }
+
       if (form.completionPolicy === "MULTIPLE_LIMITED") {
         const limit = Number(form.completionLimit);
         if (!Number.isFinite(limit) || limit < 2) {
           throw new Error("Daily completion limit must be 2 or more.");
+        }
+      }
+
+      if (form.flow === "CONDITIONAL" && form.conditionalChildTaskIds.length > 0) {
+        if (!form.conditionalFullPoints || Number(form.conditionalFullPoints) <= 0) {
+          throw new Error("Conditional full points must be greater than 0.");
         }
       }
 
@@ -286,6 +393,13 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         taskVisibility: form.visibility,
         taskFlowType: form.flow,
         streakEnabled: form.streakEnabled,
+        streakGoalDays: form.streakEnabled ? Number(form.streakGoalDays || "0") : null,
+        streakBonusPoints: form.streakEnabled ? Number(form.streakBonusPoints || "0") : null,
+        streakBonusMode: form.streakEnabled ? form.streakBonusMode : null,
+        streakRepeatEveryDays:
+          form.streakEnabled && form.streakBonusMode === "RECURRING_CUSTOM"
+            ? Number(form.streakRepeatEveryDays || "0")
+            : null,
         audience: form.audience,
         completionPolicy: form.completionPolicy,
         allowMultipleCompletionsPerCompetitionDay: form.completionPolicy !== "SINGLE",
@@ -293,6 +407,36 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           form.completionPolicy === "MULTIPLE_LIMITED"
             ? Number(form.completionLimit)
             : null,
+        conditionalChildTaskIds:
+          form.flow === "CONDITIONAL"
+            ? form.conditionalChildTaskIds
+                .map((value) => Number(value))
+                .filter((value) => Number.isInteger(value) && value > 0)
+            : [],
+        conditionalRewardTiers:
+          form.flow === "CONDITIONAL"
+            ? [
+                ...(form.conditionalPartialCount && form.conditionalPartialPoints
+                  ? [
+                      {
+                        requiredCount: Number(form.conditionalPartialCount),
+                        points: Number(form.conditionalPartialPoints),
+                        requiredTaskIds: form.conditionalPartialRequiredTaskIds
+                          .map((value) => Number(value))
+                          .filter((value) => Number.isInteger(value) && value > 0),
+                      },
+                    ]
+                  : []),
+                ...(form.conditionalChildTaskIds.length > 0 && form.conditionalFullPoints
+                  ? [
+                      {
+                        requiredCount: form.conditionalChildTaskIds.length,
+                        points: Number(form.conditionalFullPoints),
+                      },
+                    ]
+                  : []),
+              ]
+            : [],
       };
 
       const payload = {
@@ -440,6 +584,55 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
             Streak Enabled
           </label>
 
+          {form.streakEnabled ? (
+            <>
+              <label>
+                Streak goal days
+                <input
+                  value={form.streakGoalDays}
+                  onChange={(e) => setField("streakGoalDays", e.target.value)}
+                  type="number"
+                  min={1}
+                />
+              </label>
+
+              <label>
+                Streak bonus points
+                <input
+                  value={form.streakBonusPoints}
+                  onChange={(e) => setField("streakBonusPoints", e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min={0}
+                />
+              </label>
+
+              <label>
+                Streak bonus mode
+                <select
+                  value={form.streakBonusMode}
+                  onChange={(e) => setField("streakBonusMode", e.target.value as StreakBonusMode)}
+                >
+                  <option value="ONE_TIME">Stop after first bonus</option>
+                  <option value="RECURRING_SAME">Repeat every same goal days</option>
+                  <option value="RECURRING_CUSTOM">Repeat on custom interval</option>
+                </select>
+              </label>
+
+              {form.streakBonusMode === "RECURRING_CUSTOM" ? (
+                <label>
+                  Repeat every N days
+                  <input
+                    value={form.streakRepeatEveryDays}
+                    onChange={(e) => setField("streakRepeatEveryDays", e.target.value)}
+                    type="number"
+                    min={1}
+                  />
+                </label>
+              ) : null}
+            </>
+          ) : null}
+
           <label>
             Daily Completion
             <select
@@ -540,6 +733,96 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
 
           {form.flow === "CONDITIONAL" ? (
             <>
+              <label className="form-grid__full">
+                Child tasks included in this conditional reward
+                <div className="chip-row">
+                  {tasks
+                    .filter((task) => task.id !== editingTaskId && task.type !== "FORBIDDEN")
+                    .map((task) => {
+                      const checked = form.conditionalChildTaskIds.includes(String(task.id));
+                      return (
+                        <button
+                          key={task.id}
+                          type="button"
+                          className={`chip ${checked ? "chip--active" : ""}`}
+                          onClick={() =>
+                            setField(
+                              "conditionalChildTaskIds",
+                              checked
+                                ? form.conditionalChildTaskIds.filter((id) => id !== String(task.id))
+                                : [...form.conditionalChildTaskIds, String(task.id)]
+                            )
+                          }
+                        >
+                          {task.title}
+                        </button>
+                      );
+                    })}
+                </div>
+              </label>
+
+              <label>
+                Partial reward count (optional)
+                <input
+                  value={form.conditionalPartialCount}
+                  onChange={(e) => setField("conditionalPartialCount", e.target.value)}
+                  type="number"
+                  min={1}
+                />
+              </label>
+
+              <label>
+                Partial reward points (optional)
+                <input
+                  value={form.conditionalPartialPoints}
+                  onChange={(e) => setField("conditionalPartialPoints", e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min={0}
+                />
+              </label>
+
+              <label className="form-grid__full">
+                Partial reward requires specific child tasks (optional)
+                <div className="chip-row">
+                  {form.conditionalChildTaskIds.map((taskId) => {
+                    const childTask = tasks.find((task) => String(task.id) === taskId);
+                    if (!childTask) {
+                      return null;
+                    }
+                    const checked = form.conditionalPartialRequiredTaskIds.includes(taskId);
+                    return (
+                      <button
+                        key={`partial-${taskId}`}
+                        type="button"
+                        className={`chip ${checked ? "chip--active" : ""}`}
+                        onClick={() =>
+                          setField(
+                            "conditionalPartialRequiredTaskIds",
+                            checked
+                              ? form.conditionalPartialRequiredTaskIds.filter((id) => id !== taskId)
+                              : [...form.conditionalPartialRequiredTaskIds, taskId]
+                          )
+                        }
+                      >
+                        {childTask.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </label>
+
+              <label>
+                Full reward points (all child tasks)
+                <input
+                  value={form.conditionalFullPoints}
+                  onChange={(e) => setField("conditionalFullPoints", e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min={0}
+                />
+              </label>
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"

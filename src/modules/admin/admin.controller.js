@@ -8,6 +8,7 @@ import {
   createTaskSchema,
   dailyQuestionAnswerParamsSchema,
   dailyQuestionParamsSchema,
+  leaderboardVisibilitySchema,
   listAdminCountersQuerySchema,
   listAdminUserActivitiesQuerySchema,
   listAdminTasksQuerySchema,
@@ -100,6 +101,21 @@ export async function listUsers(req, res) {
 export async function removeUser(req, res) {
   const { id } = userParamsSchema.parse(req.params);
   const data = await adminService.removeUser(req.auth, id);
+
+  res.status(200).json({ data });
+}
+
+export async function setUserLeaderboardVisibility(req, res) {
+  const { id } = userParamsSchema.parse(req.params);
+  const payload = leaderboardVisibilitySchema.parse(req.body);
+  const data = await adminService.setUserLeaderboardVisibility(req.auth, id, payload.isVisible);
+
+  res.status(200).json({ data });
+}
+
+export async function removeUserAvatar(req, res) {
+  const { id } = userParamsSchema.parse(req.params);
+  const data = await adminService.removeUserAvatar(req.auth, id);
 
   res.status(200).json({ data });
 }

@@ -12,28 +12,33 @@ import { useSettingsStore } from "../../../store/settings-store";
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreMenu">;
 
 export function MoreMenuScreen({ navigation }: Props) {
-  const { colors } = useAppTheme();
+  const { colors, mode } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const user = useAuthStore((state) => state.user);
   const textAlign = isArabic ? "right" : "left";
   const chevron = isArabic ? "chevron-back" : "chevron-forward";
   const menu = [
+    { route: "Guide", label: t("more.guide"), icon: "help-circle-outline" },
     { route: "Leaderboard", label: t("more.leaderboard"), icon: "trophy-outline" },
-   // route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
+   { route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
     { route: "Notifications", label: t("more.notifications"), icon: "notifications-outline" },
-  //{ route: "Money", label: t("more.money"), icon: "cash-outline" },
-  //{ route: "ActivityStats", label: t("more.stats"), icon: "stats-chart-outline" },
+  { route: "Money", label: t("more.money"), icon: "cash-outline" },
+  { route: "ActivityStats", label: t("more.stats"), icon: "stats-chart-outline" },
     { route: "ActivityHistory", label: t("more.history"), icon: "list-outline" },
     { route: "Profile", label: t("more.profile"), icon: "person-outline" },
   ] as const;
 
   const isModernVariant = tasksDesignVariant === "modern";
   const modernHeroStyle = isModernVariant
-    ? { backgroundColor: "#f7fbff", borderColor: "#d6e3f2" }
+    ? mode === "dark"
+      ? { backgroundColor: colors.card, borderColor: colors.border }
+      : { backgroundColor: "#f7fbff", borderColor: "#d6e3f2" }
     : undefined;
   const modernRowStyle = isModernVariant
-    ? { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
+    ? mode === "dark"
+      ? { backgroundColor: colors.cardSoft, borderColor: colors.border }
+      : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
     : undefined;
 
   return (

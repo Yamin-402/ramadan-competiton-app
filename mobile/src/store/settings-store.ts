@@ -10,19 +10,23 @@ interface SettingsState {
   themePreference: ThemePreference;
   tasksDesignVariant: TasksDesignVariant;
   appLanguage: AppLanguage;
+  onboardingSeenByUserId: Record<string, boolean>;
   hydrated: boolean;
   setThemePreference: (preference: ThemePreference) => void;
   setTasksDesignVariant: (variant: TasksDesignVariant) => void;
   setAppLanguage: (language: AppLanguage) => void;
+  markOnboardingSeen: (userId: number) => void;
+  hasSeenOnboarding: (userId: number) => boolean;
   setHydrated: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       themePreference: "system",
       tasksDesignVariant: "classic",
       appLanguage: "en",
+      onboardingSeenByUserId: {},
       hydrated: false,
       setThemePreference: (themePreference) => {
         set({ themePreference });
@@ -32,6 +36,19 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setAppLanguage: (appLanguage) => {
         set({ appLanguage });
+      },
+      markOnboardingSeen: (userId) => {
+        const key = String(userId);
+        set((state) => ({
+          onboardingSeenByUserId: {
+            ...state.onboardingSeenByUserId,
+            [key]: true,
+          },
+        }));
+      },
+      hasSeenOnboarding: (userId) => {
+        const key = String(userId);
+        return Boolean(get().onboardingSeenByUserId[key]);
       },
       setHydrated: (value) => {
         set({ hydrated: value });

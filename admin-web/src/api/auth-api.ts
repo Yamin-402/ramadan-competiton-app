@@ -10,7 +10,7 @@ export const authApi = {
   login(payload: LoginPayload) {
     return requestData<AdminSession>({
       method: "POST",
-      url: "/auth/session",
+      url: "/api/v1/auth/session",
       data: payload,
     });
   },

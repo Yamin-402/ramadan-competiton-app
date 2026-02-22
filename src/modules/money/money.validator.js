@@ -31,3 +31,11 @@ export const moneyEntryParamsSchema = z.object({
 export const removeEntrySchema = z.object({
   removedReason: z.string().max(500).optional(),
 });
+
+export const moneyCommitmentParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export const clearOutstandingSchema = z.object({
+  note: z.string().max(500).optional(),
+});

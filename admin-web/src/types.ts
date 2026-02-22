@@ -60,7 +60,9 @@ export interface AdminUser {
   id: number;
   email: string;
   displayName: string | null;
+  avatarUrl?: string | null;
   role: UserRole;
+  isLeaderboardVisible?: boolean;
 }
 
 export interface AdminTaskCounterRule {
@@ -140,6 +142,8 @@ export interface LeaderboardRow {
     id: number;
     email: string;
     displayName: string | null;
+    avatarUrl?: string | null;
+    isLeaderboardVisible?: boolean;
   } | null;
   totalPoints: number;
   publicPoints: number;

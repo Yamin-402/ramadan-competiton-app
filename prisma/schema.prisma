@@ -95,6 +95,7 @@ model User {
   bio                    String?
   avatarUrl              String?
   isStreakPublic         Boolean                @default(true)
+  isLeaderboardVisible   Boolean                @default(true)
   role                   UserRole               @default(USER)
   isActive               Boolean                @default(true)
   createdAt              DateTime               @default(now())

@@ -95,6 +95,8 @@ export function GlobalNotificationOverlay() {
       "ActivityHistory",
       "Profile",
       "UserProfile",
+      "Guide",
+      "Onboarding",
     ].includes(activeRouteName);
 
   if (isMoreStackRoute) {

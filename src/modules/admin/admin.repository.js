@@ -96,7 +96,9 @@ export const adminRepository = {
         id: true,
         email: true,
         displayName: true,
+        avatarUrl: true,
         role: true,
+        isLeaderboardVisible: true,
       },
     });
   },
@@ -108,8 +110,10 @@ export const adminRepository = {
         id: true,
         email: true,
         displayName: true,
+        avatarUrl: true,
         role: true,
         isActive: true,
+        isLeaderboardVisible: true,
       },
     });
   },
@@ -124,8 +128,44 @@ export const adminRepository = {
         id: true,
         email: true,
         displayName: true,
+        avatarUrl: true,
         role: true,
         isActive: true,
+        isLeaderboardVisible: true,
+      },
+    });
+  },
+
+  updateUserLeaderboardVisibility(userId, isLeaderboardVisible) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        isLeaderboardVisible,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        isActive: true,
+        isLeaderboardVisible: true,
+      },
+    });
+  },
+
+  clearUserAvatar(userId) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        isActive: true,
+        avatarUrl: true,
       },
     });
   },
@@ -735,11 +775,14 @@ export const adminRepository = {
       prisma.user.findMany({
         where: {
           isActive: true,
+          role: "USER",
         },
         select: {
           id: true,
           displayName: true,
           email: true,
+          avatarUrl: true,
+          isLeaderboardVisible: true,
         },
       }),
       prisma.activity.groupBy({

@@ -166,6 +166,7 @@ export interface Streak {
     title: string;
     type: TaskType;
     status: TaskStatus;
+    config?: Record<string, unknown> | null;
   };
 }
 

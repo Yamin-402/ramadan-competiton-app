@@ -6,6 +6,7 @@ import { LeaderboardScreen } from "../../features/leaderboard/screens/Leaderboar
 import { MoneyScreen } from "../../features/money/screens/MoneyScreen";
 import { MoreMenuScreen } from "../../features/more/screens/MoreMenuScreen";
 import { NotificationsScreen } from "../../features/notifications/screens/NotificationsScreen";
+import { OnboardingGuideScreen } from "../../features/onboarding/screens/OnboardingGuideScreen";
 import { ProfileScreen } from "../../features/profile/screens/ProfileScreen";
 import { UserProfileScreen } from "../../features/profile/screens/UserProfileScreen";
 import { StreaksScreen } from "../../features/streaks/screens/StreaksScreen";
@@ -48,6 +49,12 @@ export function MoreStackNavigator() {
       }}
     >
       <Stack.Screen name="MoreMenu" component={MoreMenuScreen} options={{ title: t("more.title") }} />
+      <Stack.Screen
+        name="Guide"
+        component={OnboardingGuideScreen}
+        initialParams={{ mode: "replay" }}
+        options={{ title: t("more.guide"), headerRight: () => null }}
+      />
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: t("more.leaderboard") }} />
       <Stack.Screen name="Streaks" component={StreaksScreen} options={{ title: t("more.streaks") }} />
       <Stack.Screen

@@ -6,6 +6,8 @@ export const leaderboardRepository = {
       prisma.user.findMany({
         where: {
           isActive: true,
+          role: "USER",
+          isLeaderboardVisible: true,
         },
         select: {
           id: true,

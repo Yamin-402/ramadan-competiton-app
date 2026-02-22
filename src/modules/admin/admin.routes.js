@@ -22,9 +22,11 @@ import {
   listTaskCounterRules,
   listUserActivities,
   listUsers,
+  removeUserAvatar,
   removeUser,
   revealDailyQuestionAnswers,
   reviewDailyQuestionAnswer,
+  setUserLeaderboardVisibility,
   updateDailyQuestion,
   updateTask,
 } from "./admin.controller.js";
@@ -41,6 +43,8 @@ router.post("/counters", asyncHandler(createCounter));
 router.get("/counters", asyncHandler(listCounters));
 router.get("/users", asyncHandler(listUsers));
 router.delete("/users/:id", asyncHandler(removeUser));
+router.patch("/users/:id/leaderboard-visibility", asyncHandler(setUserLeaderboardVisibility));
+router.delete("/users/:id/avatar", asyncHandler(removeUserAvatar));
 router.get("/users/:id/activities", asyncHandler(listUserActivities));
 router.post("/task-counter-rules", asyncHandler(createTaskCounterRule));
 router.get("/task-counter-rules", asyncHandler(listTaskCounterRules));

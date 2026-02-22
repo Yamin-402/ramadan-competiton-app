@@ -17,7 +17,7 @@ export function UserProfileScreen({ route }: Props) {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
   const textAlign = isArabic ? "right" : "left";
-  const { userId, fallbackDisplayName, fallbackEmail } = route.params;
+  const { userId, fallbackDisplayName } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof usersApi.getPublicProfile>> | null>(null);
@@ -42,19 +42,18 @@ export function UserProfileScreen({ route }: Props) {
   );
 
   const displayName = profile?.displayName || fallbackDisplayName || t("profile.userFallback");
-  const email = fallbackEmail;
   const bio = profile?.bio || null;
   const avatarUrl = profile?.avatarUrl || null;
   const initials = useMemo(
     () =>
-      (displayName || email || "U")
+      (displayName || "U")
         .split(" ")
         .filter(Boolean)
         .map((part) => part[0])
         .slice(0, 2)
         .join("")
         .toUpperCase(),
-    [displayName, email]
+    [displayName]
   );
 
   return (
@@ -70,7 +69,6 @@ export function UserProfileScreen({ route }: Props) {
           )}
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: colors.textPrimary, textAlign }]}>{displayName}</Text>
-            <Text style={[styles.email, { color: colors.textSecondary }]}>{email}</Text>
           </View>
         </View>
       </AppCard>
@@ -141,9 +139,6 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: "800",
-  },
-  email: {
-    fontSize: 13,
   },
   sectionTitle: {
     fontSize: 16,

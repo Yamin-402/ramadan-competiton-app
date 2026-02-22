@@ -1,6 +1,6 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Image, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { streaksApi } from "../../../api/endpoints/streaks.api";
 import { usersApi } from "../../../api/endpoints/users.api";
@@ -43,7 +43,7 @@ function resolveEducationLevelLabel(
 }
 
 export function ProfileScreen() {
-  const { colors } = useAppTheme();
+  const { colors, mode } = useAppTheme();
   const { t, isArabic } = useI18n();
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
@@ -54,10 +54,13 @@ export function ProfileScreen() {
   const setTasksDesignVariant = useSettingsStore((state) => state.setTasksDesignVariant);
   const appLanguage = useSettingsStore((state) => state.appLanguage);
   const setAppLanguage = useSettingsStore((state) => state.setAppLanguage);
+  const navigation = useNavigation<any>();
   const textAlign = isArabic ? "right" : "left";
   const isModernVariant = tasksDesignVariant === "modern";
   const modernCardStyle = isModernVariant
-    ? { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
+    ? mode === "dark"
+      ? { backgroundColor: colors.card, borderColor: colors.border }
+      : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
     : undefined;
 
   const [displayName, setDisplayName] = useState(user?.displayName || "");
@@ -71,6 +74,7 @@ export function ProfileScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [pickingAvatar, setPickingAvatar] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -184,6 +188,11 @@ export function ProfileScreen() {
     }
   };
 
+  const removeAvatar = () => {
+    setAvatarUrl("");
+    setAvatarModalVisible(false);
+  };
+
   return (
     <ScreenContainer>
       <Text style={[styles.pageTitle, { color: colors.textPrimary, textAlign }]}>
@@ -196,13 +205,15 @@ export function ProfileScreen() {
       >
         <AppCard style={modernCardStyle}>
           <View style={styles.headerRow}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
-                <Text style={styles.avatarText}>{initials}</Text>
-              </View>
-            )}
+            <Pressable onPress={() => setAvatarModalVisible(true)}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+              )}
+            </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.textPrimary }]}>
                 {displayName || user?.email || t("profile.userFallback")}
@@ -225,19 +236,6 @@ export function ProfileScreen() {
             onChangeText={setBio}
             multiline
             placeholder={t("profile.bioPlaceholder")}
-          />
-          <AppTextInput
-            label={t("profile.avatarUrl")}
-            value={avatarUrl}
-            onChangeText={setAvatarUrl}
-            autoCapitalize="none"
-            placeholder={t("profile.avatarHint")}
-          />
-          <AppButton
-            label={pickingAvatar ? t("common.loading") : t("profile.pickPhoto")}
-            onPress={() => void pickAvatar()}
-            variant="ghost"
-            disabled={pickingAvatar}
           />
           <View style={styles.privacyRow}>
             <View style={{ flex: 1 }}>
@@ -270,6 +268,7 @@ export function ProfileScreen() {
           </Text>
         </AppCard>
 
+
         <AppCard style={modernCardStyle}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
             {t("profile.titleLayout")}
@@ -294,6 +293,28 @@ export function ProfileScreen() {
 
         <AppCard style={modernCardStyle}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
+            {t("profile.titleTheme")}
+          </Text>
+          <View style={styles.themeOptions}>
+            {themeOptions.map((option) => (
+              <AppButton
+                key={option}
+                label={
+                  option === "system"
+                    ? t("profile.themeSystem")
+                    : option === "light"
+                      ? t("profile.themeLight")
+                      : t("profile.themeDark")
+                }
+                variant={themePreference === option ? "primary" : "ghost"}
+                onPress={() => setThemePreference(option)}
+              />
+            ))}
+          </View>
+        </AppCard>
+        
+        <AppCard style={modernCardStyle}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
             {t("profile.titleLanguage")}
           </Text>
           <View style={styles.themeOptions}>
@@ -308,12 +329,63 @@ export function ProfileScreen() {
           </View>
         </AppCard>
 
+        <AppButton
+          label={t("profile.replayGuide")}
+          variant="ghost"
+          onPress={() => navigation.navigate("Guide")}
+        />
+
         {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
         <AppButton label={t("common.logout")} variant="danger" onPress={logout} />
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal
+        visible={avatarModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarModalVisible(false)}
+      >
+        <Pressable
+          style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.45)" }]}
+          onPress={() => setAvatarModalVisible(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => undefined}
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.modalAvatarPreview} resizeMode="cover" />
+            ) : (
+              <View style={[styles.modalAvatarPreview, styles.avatar, { backgroundColor: colors.gold }]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
+            <AppButton
+              label={pickingAvatar ? t("common.loading") : t("profile.pickPhoto")}
+              onPress={() => void pickAvatar()}
+              variant="ghost"
+              disabled={pickingAvatar}
+            />
+            {avatarUrl ? (
+              <AppButton label={t("profile.removePhoto")} onPress={removeAvatar} variant="danger" />
+            ) : null}
+            <AppButton
+              label={t("common.done")}
+              onPress={() => setAvatarModalVisible(false)}
+              variant="ghost"
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -381,5 +453,25 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     marginVertical: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  modalAvatarPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: "center",
   },
 });

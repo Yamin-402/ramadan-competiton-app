@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { moneyApi } from "../../../api/endpoints/money.api";
 import { tasksApi } from "../../../api/endpoints/tasks.api";
 import { getApiErrorMessage } from "../../../api/client";
@@ -20,19 +20,34 @@ import { getTaskCategory } from "../../tasks/task-presentation";
 type CommitmentChoice = "COMPLETED" | "NOT_COMPLETED";
 
 export function MoneyScreen() {
-  const { colors } = useAppTheme();
+  const { colors, mode } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const textAlign = isArabic ? "right" : "left";
   const isModernVariant = tasksDesignVariant === "modern";
   const modernCardStyle = isModernVariant
-    ? { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
+    ? mode === "dark"
+      ? { backgroundColor: colors.card, borderColor: colors.border }
+      : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
     : undefined;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [commitments, setCommitments] = useState<MoneyCommitment[]>([]);
   const [entries, setEntries] = useState<MoneyEntry[]>([]);
+  const [settlements, setSettlements] = useState<
+    Array<{
+      batchId: string;
+      settledAt: string;
+      totalPaid: number;
+      entries: Array<{
+        id: number;
+        task: MoneyEntry["task"];
+        amount: number;
+        date: string;
+      }>;
+    }>
+  >([]);
   const [total, setTotal] = useState<number | string>(0);
 
   const [showTaskPicker, setShowTaskPicker] = useState(false);
@@ -52,6 +67,7 @@ export function MoneyScreen() {
         tasksApi.listAvailable(),
       ]);
       setEntries(summary.entries);
+      setSettlements(summary.settlements || []);
       setTotal(summary.totalAmount);
       setCommitments(commitmentRows);
       setTasks(taskRows);
@@ -127,6 +143,42 @@ export function MoneyScreen() {
     }
   };
 
+  const removeCommitment = async (commitmentId: number) => {
+    setError(null);
+    try {
+      await moneyApi.removeCommitment(commitmentId);
+      await loadData();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not remove rule"));
+    }
+  };
+
+  const clearOutstanding = async () => {
+    if (entries.length === 0) {
+      setError(t("money.noOutstanding"));
+      return;
+    }
+
+    Alert.alert(t("money.clearAllConfirmTitle"), t("money.clearAllConfirmBody"), [
+      { text: t("common.no"), style: "cancel" },
+      {
+        text: t("common.yes"),
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            setError(null);
+            try {
+              await moneyApi.clearOutstanding("User marked as paid from mobile");
+              await loadData();
+            } catch (err) {
+              setError(getApiErrorMessage(err, "Could not clear outstanding amount"));
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   const selectedTask = useMemo(
     () => tasks.find((item) => item.id === selectedTaskId) || null,
     [selectedTaskId, tasks]
@@ -142,6 +194,11 @@ export function MoneyScreen() {
           onPress={() => void evaluateToday()}
           disabled={evaluating}
           variant="ghost"
+        />
+        <AppButton
+          label={t("money.clearAllDue")}
+          onPress={() => void clearOutstanding()}
+          variant="danger"
         />
       </AppCard>
 
@@ -241,6 +298,11 @@ export function MoneyScreen() {
                     : t("money.whenNotCompleted"))}{" "}
                   | {formatMoney(item.amount)}
                 </Text>
+                <AppButton
+                  label={t("money.removeCommitment")}
+                  variant="ghost"
+                  onPress={() => void removeCommitment(item.id)}
+                />
               </AppCard>
             ))
           )}
@@ -265,6 +327,27 @@ export function MoneyScreen() {
                   variant="danger"
                   onPress={() => void removeEntry(entry.id)}
                 />
+              </AppCard>
+            ))
+          )}
+
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
+            {t("money.settlements")}
+          </Text>
+          {settlements.length === 0 ? (
+            <EmptyState title={t("money.emptySettlements")} />
+          ) : (
+            settlements.map((settlement) => (
+              <AppCard key={settlement.batchId} style={modernCardStyle}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t("money.paidAmount")}: {formatMoney(settlement.totalPaid)}
+                </Text>
+                <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
+                  {formatDate(settlement.settledAt)}
+                </Text>
+                <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
+                  {settlement.entries.map((entry) => entry.task.title).join(" | ")}
+                </Text>
               </AppCard>
             ))
           )}

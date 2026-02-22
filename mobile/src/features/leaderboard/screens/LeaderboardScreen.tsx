@@ -18,7 +18,7 @@ import { useSettingsStore } from "../../../store/settings-store";
 const PAGE_SIZE = 20;
 
 export function LeaderboardScreen() {
-  const { colors } = useAppTheme();
+  const { colors, mode } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const textAlign = isArabic ? "right" : "left";
@@ -64,7 +64,9 @@ export function LeaderboardScreen() {
 
   const isModernVariant = tasksDesignVariant === "modern";
   const modernCardStyle = isModernVariant
-    ? { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
+    ? mode === "dark"
+      ? { backgroundColor: colors.card, borderColor: colors.border }
+      : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
     : undefined;
 
   return (

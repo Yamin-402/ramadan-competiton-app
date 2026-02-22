@@ -3,7 +3,7 @@ import { ExpoConfig } from "expo/config";
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const config: ExpoConfig = {
-  name: "Ramadan Competition",
+  name: "Ramadani Competition",
   slug: "ramadan-competition-mobile",
   version: "1.0.0",
   orientation: "portrait",

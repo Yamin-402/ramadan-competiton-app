@@ -18,6 +18,17 @@ interface CreateFriendlyCommitmentPayload {
 interface MoneySummaryResponse {
   totalAmount: number | string;
   entries: MoneyEntry[];
+  settlements: Array<{
+    batchId: string;
+    settledAt: string;
+    totalPaid: number;
+    entries: Array<{
+      id: number;
+      task: MoneyEntry["task"];
+      amount: number;
+      date: string;
+    }>;
+  }>;
 }
 
 interface EvaluateResponse {
@@ -27,6 +38,22 @@ interface EvaluateResponse {
 interface RemoveEntryResponse {
   removed: boolean;
   alreadyRemoved?: boolean;
+}
+
+interface RemoveCommitmentResponse {
+  removed: boolean;
+}
+
+interface ClearOutstandingResponse {
+  cleared: number;
+  totalPaid: number;
+  batchId: string | null;
+  settledAt?: string;
+  tasks?: Array<{
+    taskId: number;
+    taskTitle: string;
+    amount: number;
+  }>;
 }
 
 export const moneyApi = {
@@ -63,6 +90,16 @@ export const moneyApi = {
       apiClient.post(`/money/entries/${id}/remove`, {
         removedReason,
       })
+    );
+  },
+
+  removeCommitment(id: number) {
+    return unwrapData<RemoveCommitmentResponse>(apiClient.delete(`/money/commitments/${id}`));
+  },
+
+  clearOutstanding(note?: string) {
+    return unwrapData<ClearOutstandingResponse>(
+      apiClient.post("/money/clear-outstanding", { note })
     );
   },
 };

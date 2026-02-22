@@ -1,8 +1,10 @@
 import {
   createCommitmentSchema,
   createFriendlyCommitmentSchema,
+  clearOutstandingSchema,
   evaluateTodaySchema,
   listCommitmentsQuerySchema,
+  moneyCommitmentParamsSchema,
   moneyEntryParamsSchema,
   removeEntrySchema,
   summaryQuerySchema,
@@ -48,6 +50,20 @@ export async function removeEntry(req, res) {
   const { id } = moneyEntryParamsSchema.parse(req.params);
   const payload = removeEntrySchema.parse(req.body ?? {});
   const data = await moneyService.removeEntry(req.auth, id, payload.removedReason);
+
+  res.status(200).json({ data });
+}
+
+export async function removeCommitment(req, res) {
+  const { id } = moneyCommitmentParamsSchema.parse(req.params);
+  const data = await moneyService.removeCommitment(req.auth, id);
+
+  res.status(200).json({ data });
+}
+
+export async function clearOutstanding(req, res) {
+  const payload = clearOutstandingSchema.parse(req.body ?? {});
+  const data = await moneyService.clearOutstanding(req.auth, payload.note);
 
   res.status(200).json({ data });
 }

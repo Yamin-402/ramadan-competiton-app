@@ -45,6 +45,10 @@ export const userParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+export const leaderboardVisibilitySchema = z.object({
+  isVisible: z.boolean(),
+});
+
 export const createTaskSchema = z.object({
   key: z.string().min(2),
   title: z.string().min(2),

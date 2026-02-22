@@ -2,6 +2,11 @@ import { NavigatorScreenParams } from "@react-navigation/native";
 
 export type RootStackParamList = {
   Auth: undefined;
+  Onboarding:
+    | {
+        mode?: "first_login" | "replay";
+      }
+    | undefined;
   Main: NavigatorScreenParams<MainTabParamList>;
 };
 
@@ -19,6 +24,11 @@ export type MainTabParamList = {
 
 export type MoreStackParamList = {
   MoreMenu: undefined;
+  Guide:
+    | {
+        mode?: "first_login" | "replay";
+      }
+    | undefined;
   Leaderboard: undefined;
   Streaks: undefined;
   Notifications: undefined;

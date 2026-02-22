@@ -132,14 +132,46 @@ export const moneyService = {
 
   async getSummary(auth, query) {
     const userId = getAuthUserId(auth);
-    const [entries, totals] = await Promise.all([
+    const [entries, totals, settlementEntries] = await Promise.all([
       moneyRepository.listMoneyEntriesByUser(userId, query.limit),
       moneyRepository.sumMoneyEntriesByUser(userId),
+      moneyRepository.listSettlementEntriesByUser(userId, query.limit),
     ]);
+
+    const settlementsByBatch = new Map();
+    for (const entry of settlementEntries) {
+      const reason = entry.removedReason || "";
+      const batchId = reason.startsWith("USER_SETTLED:")
+        ? reason.replace("USER_SETTLED:", "").split(":")[0]
+        : null;
+      if (!batchId) {
+        continue;
+      }
+
+      const existing = settlementsByBatch.get(batchId) || {
+        batchId,
+        settledAt: entry.removedAt,
+        totalPaid: 0,
+        entries: [],
+      };
+      existing.totalPaid += Number(entry.amount);
+      existing.entries.push({
+        id: entry.id,
+        task: entry.task,
+        amount: Number(entry.amount),
+        date: entry.date,
+      });
+      settlementsByBatch.set(batchId, existing);
+    }
+
+    const settlements = Array.from(settlementsByBatch.values()).sort(
+      (left, right) => new Date(right.settledAt).getTime() - new Date(left.settledAt).getTime()
+    );
 
     return {
       totalAmount: Number(totals._sum.amount || 0),
       entries,
+      settlements,
     };
   },
 
@@ -157,5 +189,57 @@ export const moneyService = {
     }
 
     return { removed: true };
+  },
+
+  async removeCommitment(auth, id) {
+    const userId = getAuthUserId(auth);
+    const deleted = await moneyRepository.deleteCommitmentById(userId, id);
+
+    if (deleted.count === 0) {
+      const existing = await moneyRepository.findCommitmentById(userId, id);
+      if (!existing) {
+        throw new AppError(404, "Commitment not found");
+      }
+    }
+
+    return { removed: deleted.count > 0 };
+  },
+
+  async clearOutstanding(auth, note) {
+    const userId = getAuthUserId(auth);
+    const entries = await moneyRepository.listOutstandingEntriesByUser(userId);
+
+    if (entries.length === 0) {
+      return {
+        cleared: 0,
+        totalPaid: 0,
+        batchId: null,
+      };
+    }
+
+    const batchId = `${Date.now()}`;
+    const removedReason = `USER_SETTLED:${batchId}${note ? `:${note}` : ""}`;
+    const removedAt = new Date();
+
+    await moneyRepository.softDeleteEntriesByIds(
+      userId,
+      entries.map((entry) => entry.id),
+      removedReason,
+      removedAt
+    );
+
+    const totalPaid = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
+
+    return {
+      cleared: entries.length,
+      totalPaid: Number(totalPaid.toFixed(2)),
+      batchId,
+      settledAt: removedAt.toISOString(),
+      tasks: entries.map((entry) => ({
+        taskId: entry.taskId,
+        taskTitle: entry.task.title,
+        amount: Number(entry.amount),
+      })),
+    };
   },
 };

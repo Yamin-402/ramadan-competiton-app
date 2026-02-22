@@ -498,6 +498,65 @@ export const adminService = {
     return removed;
   },
 
+  async setUserLeaderboardVisibility(auth, userId, isVisible) {
+    const adminId = getAuthUserId(auth);
+    const user = await adminRepository.findUserById(userId);
+    if (!user) {
+      throw new AppError(404, "User not found");
+    }
+
+    if (!user.isActive) {
+      throw new AppError(409, "User is not active");
+    }
+
+    if (user.role !== "USER") {
+      throw new AppError(400, "Only regular users can be shown on leaderboard");
+    }
+
+    const updated = await adminRepository.updateUserLeaderboardVisibility(userId, isVisible);
+
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "UPDATE_LEADERBOARD_VISIBILITY",
+      entityType: "USER",
+      entityId: String(userId),
+      summary: `${isVisible ? "Revealed" : "Hidden"} user ${user.email} on leaderboard`,
+      payload: {
+        userId,
+        isLeaderboardVisible: isVisible,
+      },
+    });
+
+    return updated;
+  },
+
+  async removeUserAvatar(auth, userId) {
+    const adminId = getAuthUserId(auth);
+    const user = await adminRepository.findUserById(userId);
+    if (!user) {
+      throw new AppError(404, "User not found");
+    }
+
+    if (!user.isActive) {
+      throw new AppError(409, "User is not active");
+    }
+
+    const updated = await adminRepository.clearUserAvatar(userId);
+
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "REMOVE_USER_AVATAR",
+      entityType: "USER",
+      entityId: String(userId),
+      summary: `Removed profile photo for ${user.email}`,
+      payload: {
+        userId,
+      },
+    });
+
+    return updated;
+  },
+
   async listUserActivities(_auth, userId, query) {
     const user = await adminRepository.findUserById(userId);
     if (!user) {

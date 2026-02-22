@@ -70,6 +70,164 @@ function configPositiveInteger(task, key) {
   return Math.floor(value);
 }
 
+function configPositiveNumber(task, key) {
+  const config = task?.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return null;
+  }
+
+  const raw = config[key];
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function getConfigObject(task) {
+  const config = task?.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return null;
+  }
+
+  return config;
+}
+
+function parsePositiveIdArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    )
+  );
+}
+
+function parseConditionalRewardTiers(task) {
+  const config = getConfigObject(task);
+  if (!config) {
+    return [];
+  }
+
+  const raw = config.conditionalRewardTiers;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const tiers = raw
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+
+      const requiredCount = Math.floor(Number(item.requiredCount));
+      const points = Number(item.points);
+      const requiredTaskIds = parsePositiveIdArray(item.requiredTaskIds);
+
+      if (!Number.isFinite(requiredCount) || requiredCount <= 0 || !Number.isFinite(points)) {
+        return null;
+      }
+
+      return {
+        requiredCount,
+        points,
+        requiredTaskIds,
+      };
+    })
+    .filter(Boolean);
+
+  return tiers.sort((left, right) => left.requiredCount - right.requiredCount);
+}
+
+function parseConditionalChildConfig(task) {
+  const config = getConfigObject(task);
+  if (!config) {
+    return null;
+  }
+
+  const childTaskIds = parsePositiveIdArray(config.conditionalChildTaskIds);
+  if (childTaskIds.length === 0) {
+    return null;
+  }
+
+  const tiers = parseConditionalRewardTiers(task);
+  if (tiers.length === 0) {
+    return null;
+  }
+
+  return {
+    childTaskIds,
+    tiers,
+  };
+}
+
+function isConditionalChildAutoAwardTask(task) {
+  if (task.type !== "CONDITIONAL") {
+    return false;
+  }
+
+  return Boolean(parseConditionalChildConfig(task));
+}
+
+function resolveStreakBonusConfig(task) {
+  if (!isStreakEnabledTask(task)) {
+    return null;
+  }
+
+  const goalDays = configPositiveInteger(task, "streakGoalDays");
+  const bonusPoints = configPositiveNumber(task, "streakBonusPoints");
+
+  if (!goalDays || !bonusPoints) {
+    return null;
+  }
+
+  const mode = configString(task, "streakBonusMode")?.toUpperCase() || "ONE_TIME";
+  const repeatEveryDays = configPositiveInteger(task, "streakRepeatEveryDays") || goalDays;
+
+  return {
+    goalDays,
+    bonusPoints,
+    mode,
+    repeatEveryDays,
+  };
+}
+
+function resolveStreakBonusCycle(currentStreak, bonusConfig) {
+  if (currentStreak < bonusConfig.goalDays) {
+    return null;
+  }
+
+  if (bonusConfig.mode === "RECURRING_SAME") {
+    if (currentStreak % bonusConfig.goalDays !== 0) {
+      return null;
+    }
+    return Math.floor(currentStreak / bonusConfig.goalDays);
+  }
+
+  if (bonusConfig.mode === "RECURRING_CUSTOM") {
+    if (currentStreak === bonusConfig.goalDays) {
+      return 1;
+    }
+
+    const diff = currentStreak - bonusConfig.goalDays;
+    if (diff <= 0 || diff % bonusConfig.repeatEveryDays !== 0) {
+      return null;
+    }
+    return 1 + Math.floor(diff / bonusConfig.repeatEveryDays);
+  }
+
+  if (currentStreak === bonusConfig.goalDays) {
+    return 1;
+  }
+
+  return null;
+}
+
 function resolveCompletionLimit(task) {
   const policy = configString(task, "completionPolicy")?.toUpperCase();
   if (policy === "SINGLE") {
@@ -355,6 +513,169 @@ function buildCounterDeltas(task, payload) {
   });
 }
 
+async function maybeCreateStreakBonusActivity({
+  userId,
+  task,
+  occurredAt,
+  isDuringFasting,
+  fastingMultiplier,
+  currentStreak,
+}) {
+  const bonusConfig = resolveStreakBonusConfig(task);
+  if (!bonusConfig) {
+    return;
+  }
+
+  const cycle = resolveStreakBonusCycle(currentStreak, bonusConfig);
+  if (!cycle) {
+    return;
+  }
+
+  const note = `STREAK_BONUS:${task.id}:${bonusConfig.goalDays}:${cycle}`;
+  const existing = await activitiesRepository.findSystemActivityByNote({
+    userId,
+    taskId: task.id,
+    note,
+  });
+
+  if (existing) {
+    return;
+  }
+
+  const basePoints = Number(bonusConfig.bonusPoints.toFixed(2));
+  const effectivePoints = Number((basePoints * fastingMultiplier).toFixed(2));
+
+  await activitiesRepository.createSystemActivity({
+    userId,
+    taskId: task.id,
+    occurredAt,
+    timezone: env.appTimezone,
+    isDuringFasting,
+    fastingMultiplier,
+    basePoints,
+    effectivePoints,
+    note,
+    metadata: {
+      kind: "STREAK_BONUS",
+      cycle,
+      goalDays: bonusConfig.goalDays,
+    },
+  });
+}
+
+function evaluateConditionalTierPoints(tiers, completedTaskIdsSet, completedCount) {
+  let points = 0;
+
+  for (const tier of tiers) {
+    if (completedCount < tier.requiredCount) {
+      continue;
+    }
+
+    if (tier.requiredTaskIds.length > 0) {
+      const allRequiredPresent = tier.requiredTaskIds.every((taskId) =>
+        completedTaskIdsSet.has(taskId)
+      );
+      if (!allRequiredPresent) {
+        continue;
+      }
+    }
+
+    if (tier.points > points) {
+      points = tier.points;
+    }
+  }
+
+  return Number(points.toFixed(2));
+}
+
+async function maybeCreateConditionalChildBonusActivities({
+  userId,
+  sourceTaskId,
+  occurredAt,
+  userTagSet,
+  isDuringFasting,
+  fastingMultiplier,
+}) {
+  const parentTasks = await activitiesRepository.listConditionalTasksByChildTaskId(sourceTaskId);
+  if (parentTasks.length === 0) {
+    return;
+  }
+
+  const { competitionDate, windowStart, windowEnd } = await resolveCompetitionWindow(occurredAt);
+  const competitionDateString = toAppDateString(competitionDate);
+
+  for (const parentTask of parentTasks) {
+    if (!isTaskVisibleForUser(parentTask, userTagSet)) {
+      continue;
+    }
+
+    const childConfig = parseConditionalChildConfig(parentTask);
+    if (!childConfig || !childConfig.childTaskIds.includes(sourceTaskId)) {
+      continue;
+    }
+
+    const completedTaskIds = await activitiesRepository.listDistinctCompletedTaskIdsInWindow({
+      userId,
+      taskIds: childConfig.childTaskIds,
+      startAt: windowStart,
+      endAt: windowEnd,
+    });
+    const completedTaskIdsSet = new Set(completedTaskIds);
+    const completedCount = completedTaskIdsSet.size;
+
+    const targetPoints = evaluateConditionalTierPoints(
+      childConfig.tiers,
+      completedTaskIdsSet,
+      completedCount
+    );
+
+    if (targetPoints <= 0) {
+      continue;
+    }
+
+    const notePrefix = `CONDITIONAL_CHILD_BONUS:${parentTask.id}:${competitionDateString}:`;
+    const awardedPoints = await activitiesRepository.sumSystemActivityPointsByNotePrefix({
+      userId,
+      taskId: parentTask.id,
+      notePrefix,
+    });
+
+    const deltaPoints = Number((targetPoints - awardedPoints).toFixed(2));
+    if (deltaPoints <= 0) {
+      continue;
+    }
+
+    const note = `${notePrefix}${targetPoints}`;
+    const existing = await activitiesRepository.findSystemActivityByNote({
+      userId,
+      taskId: parentTask.id,
+      note,
+    });
+    if (existing) {
+      continue;
+    }
+
+    const effectivePoints = Number((deltaPoints * fastingMultiplier).toFixed(2));
+    await activitiesRepository.createSystemActivity({
+      userId,
+      taskId: parentTask.id,
+      occurredAt,
+      timezone: env.appTimezone,
+      isDuringFasting,
+      fastingMultiplier,
+      basePoints: deltaPoints,
+      effectivePoints,
+      note,
+      metadata: {
+        kind: "CONDITIONAL_CHILD_BONUS",
+        competitionDate: competitionDateString,
+        completedCount,
+        targetPoints,
+      },
+    });
+  }
+}
+
 export const activitiesService = {
   async createTaskCompletion(auth, payload) {
     const userId = getAuthUserId(auth);
@@ -380,6 +701,11 @@ export const activitiesService = {
 
     await assertDependencies(userId, task.dependencies, occurredAt);
     await assertConditions(userId, userTagSet, task.conditions, occurredAt);
+
+    if (isConditionalChildAutoAwardTask(task)) {
+      throw new AppError(400, "This conditional task is auto-awarded from child tasks");
+    }
+
     await assertNotAlreadyCompletedInCompetitionDay(task, userId, occurredAt);
 
     const isDuringFasting =
@@ -421,8 +747,25 @@ export const activitiesService = {
     });
 
     if (shouldApplyStreak) {
-      await streaksService.evaluateUserTask(userId, task.id);
+      const evaluatedStreak = await streaksService.evaluateUserTask(userId, task.id);
+      await maybeCreateStreakBonusActivity({
+        userId,
+        task,
+        occurredAt,
+        isDuringFasting,
+        fastingMultiplier,
+        currentStreak: evaluatedStreak.currentStreak,
+      });
     }
+
+    await maybeCreateConditionalChildBonusActivities({
+      userId,
+      sourceTaskId: task.id,
+      occurredAt,
+      userTagSet,
+      isDuringFasting,
+      fastingMultiplier,
+    });
 
     return activity;
   },

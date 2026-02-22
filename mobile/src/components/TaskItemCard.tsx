@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
+  getStreakBonusPoints,
+  getStreakDaysLeft,
+  getStreakGoalDays,
   getTaskInteractionKind,
+  isAutoConditionalBonusTask,
   isTimedTask,
   isStreakEnabledTask,
   TaskInteractionKind,
@@ -64,6 +68,10 @@ export function TaskItemCard({
   const showAmount = interactionKind === "NUMERIC";
   const isTimed = isTimedTask(task);
   const showStreak = isStreakEnabledTask(task);
+  const isAutoConditional = isAutoConditionalBonusTask(task);
+  const streakGoalDays = getStreakGoalDays(task);
+  const streakDaysLeft = getStreakDaysLeft(task, streakCount);
+  const streakBonusPoints = getStreakBonusPoints(task);
 
   return (
     <AppCard
@@ -98,6 +106,30 @@ export function TaskItemCard({
             style={[styles.chip, { color: colors.success, borderColor: colors.success }]}
           >
             {t("tasks.streakLabel")}: {streakCount}
+          </Text>
+        ) : null}
+        {showStreak && streakGoalDays ? (
+          <Text
+            numberOfLines={1}
+            style={[styles.chip, { color: colors.textPrimary, borderColor: colors.border }]}
+          >
+            {t("tasks.streakGoal")}: {streakCount}/{streakGoalDays}
+          </Text>
+        ) : null}
+        {showStreak && streakDaysLeft !== null ? (
+          <Text
+            numberOfLines={1}
+            style={[styles.chip, { color: colors.textSecondary, borderColor: colors.border }]}
+          >
+            {t("tasks.streakLeft", { days: streakDaysLeft })}
+          </Text>
+        ) : null}
+        {showStreak && streakBonusPoints ? (
+          <Text
+            numberOfLines={1}
+            style={[styles.chip, { color: colors.gold, borderColor: colors.gold }]}
+          >
+            {t("tasks.streakBonus")}: {formatPoints(streakBonusPoints)}
           </Text>
         ) : null}
       </View>
@@ -137,6 +169,8 @@ export function TaskItemCard({
         label={
           logging
             ? t("common.saving")
+            : isAutoConditional
+              ? t("tasks.autoReward")
             : completedToday
               ? t("tasks.completedToday")
               : forbiddenStyle
@@ -144,7 +178,7 @@ export function TaskItemCard({
                 : t("common.done")
         }
         onPress={onLog}
-        disabled={logging || completedToday}
+        disabled={logging || completedToday || isAutoConditional}
         variant={forbiddenStyle ? "danger" : "primary"}
       />
     </AppCard>

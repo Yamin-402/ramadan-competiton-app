@@ -20,9 +20,12 @@ import { Task } from "../../../types/domain";
 import { formatPoints } from "../../../utils/format";
 import { pointsEvents } from "../../../events/points-events";
 import {
+  getStreakDaysLeft,
+  getStreakGoalDays,
   getTaskCategory,
   getDailyCompletionLimit,
   getTaskInteractionKind,
+  isAutoConditionalBonusTask,
   isTimedTask,
   isStreakEnabledTask,
   TaskInteractionKind,
@@ -784,6 +787,9 @@ function RamadanTaskCard({
   const [expanded, setExpanded] = useState(false);
   const interactionKind = getTaskInteractionKind(task);
   const showAmount = interactionKind === "NUMERIC";
+  const streakGoalDays = getStreakGoalDays(task);
+  const streakDaysLeft = getStreakDaysLeft(task, streakCount);
+  const isAutoConditional = isAutoConditionalBonusTask(task);
 
   return (
     <LinearGradient
@@ -805,6 +811,14 @@ function RamadanTaskCard({
           <Text style={styles.ramadanBadge}>
             {t("tasks.streakLabel")}: {streakCount}
           </Text>
+          {streakGoalDays ? (
+            <Text style={styles.ramadanBadge}>
+              {t("tasks.streakGoal")}: {streakCount}/{streakGoalDays}
+            </Text>
+          ) : null}
+          {streakDaysLeft !== null ? (
+            <Text style={styles.ramadanBadge}>{t("tasks.streakLeft", { days: streakDaysLeft })}</Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -839,9 +853,17 @@ function RamadanTaskCard({
 
       <View style={styles.ramadanActions}>
         <AppButton
-          label={logging ? t("common.saving") : completedToday ? t("tasks.completedToday") : t("common.done")}
+          label={
+            logging
+              ? t("common.saving")
+              : isAutoConditional
+                ? t("tasks.autoReward")
+                : completedToday
+                  ? t("tasks.completedToday")
+                  : t("common.done")
+          }
           onPress={onLog}
-          disabled={logging || completedToday}
+          disabled={logging || completedToday || isAutoConditional}
           style={styles.growButton}
         />
       </View>
@@ -879,6 +901,9 @@ function ModernTaskCard({
   const [expanded, setExpanded] = useState(false);
   const interactionKind = getTaskInteractionKind(task);
   const showAmount = interactionKind === "NUMERIC";
+  const streakGoalDays = getStreakGoalDays(task);
+  const streakDaysLeft = getStreakDaysLeft(task, streakCount);
+  const isAutoConditional = isAutoConditionalBonusTask(task);
 
   return (
     <View style={styles.modernTaskCard}>
@@ -894,7 +919,21 @@ function ModernTaskCard({
           <Text style={styles.modernTaskPts}>+{task.basePoints}</Text>
         </View>
 
-        {showStreak ? <Text style={styles.modernMiniStat}>{t("tasks.streakLabel")} {streakCount}</Text> : null}
+        {showStreak ? (
+          <View style={styles.modernMiniStats}>
+            <Text style={styles.modernMiniStat}>
+              {t("tasks.streakLabel")} {streakCount}
+            </Text>
+            {streakGoalDays ? (
+              <Text style={styles.modernMiniStat}>
+                {t("tasks.streakGoal")} {streakCount}/{streakGoalDays}
+              </Text>
+            ) : null}
+            {streakDaysLeft !== null ? (
+              <Text style={styles.modernMiniStat}>{t("tasks.streakLeft", { days: streakDaysLeft })}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <Pressable onPress={() => setExpanded((prev) => !prev)}>
           <Text style={styles.modernDetailToggle}>
@@ -927,9 +966,17 @@ function ModernTaskCard({
 
         <View style={styles.modernActions}>
           <AppButton
-            label={logging ? t("common.saving") : completedToday ? t("tasks.completedToday") : t("common.done")}
+            label={
+              logging
+                ? t("common.saving")
+                : isAutoConditional
+                  ? t("tasks.autoReward")
+                  : completedToday
+                    ? t("tasks.completedToday")
+                    : t("common.done")
+            }
             onPress={onLog}
-            disabled={logging || completedToday}
+            disabled={logging || completedToday || isAutoConditional}
             style={styles.growButton}
           />
         </View>

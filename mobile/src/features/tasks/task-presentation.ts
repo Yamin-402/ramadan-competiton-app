@@ -30,6 +30,16 @@ function getConfigNumber(task: Task, key: string): number | null {
   return Math.floor(value);
 }
 
+function getConfigPositiveNumber(task: Task, key: string): number | null {
+  const raw = task.config?.[key];
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
 function getTaskAudience(task: Task): string | null {
   const raw = task.config?.audience;
   if (typeof raw !== "string") {
@@ -70,6 +80,19 @@ export function isConditionalTask(task: Task): boolean {
   );
 }
 
+export function isAutoConditionalBonusTask(task: Task): boolean {
+  if (!isConditionalTask(task)) {
+    return false;
+  }
+
+  const childTaskIds = task.config?.conditionalChildTaskIds;
+  if (!Array.isArray(childTaskIds)) {
+    return false;
+  }
+
+  return childTaskIds.some((value) => Number.isInteger(Number(value)) && Number(value) > 0);
+}
+
 export function isStreakEnabledTask(task: Task): boolean {
   if (task.type === "STREAK") {
     return true;
@@ -84,6 +107,32 @@ export function isStreakEnabledTask(task: Task): boolean {
   }
 
   return false;
+}
+
+export function getStreakGoalDays(task: Task): number | null {
+  if (!isStreakEnabledTask(task)) {
+    return null;
+  }
+
+  return getConfigNumber(task, "streakGoalDays");
+}
+
+export function getStreakBonusPoints(task: Task): number | null {
+  if (!isStreakEnabledTask(task)) {
+    return null;
+  }
+
+  return getConfigPositiveNumber(task, "streakBonusPoints");
+}
+
+export function getStreakDaysLeft(task: Task, currentStreak: number): number | null {
+  const goalDays = getStreakGoalDays(task);
+  if (!goalDays) {
+    return null;
+  }
+
+  const remaining = goalDays - currentStreak;
+  return remaining > 0 ? remaining : 0;
 }
 
 export function getDailyCompletionLimit(task: Task): number | null {

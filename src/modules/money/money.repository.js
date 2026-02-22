@@ -116,6 +116,29 @@ export const moneyRepository = {
     });
   },
 
+  listOutstandingEntriesByUser(userId) {
+    return prisma.moneyEntry.findMany({
+      where: { userId, removedAt: null },
+      include: entryInclude,
+      orderBy: [{ date: "desc" }, { id: "desc" }],
+    });
+  },
+
+  listSettlementEntriesByUser(userId, limit) {
+    return prisma.moneyEntry.findMany({
+      where: {
+        userId,
+        removedAt: { not: null },
+        removedReason: {
+          startsWith: "USER_SETTLED:",
+        },
+      },
+      include: entryInclude,
+      orderBy: [{ removedAt: "desc" }, { id: "desc" }],
+      take: limit,
+    });
+  },
+
   sumMoneyEntriesByUser(userId) {
     return prisma.moneyEntry.aggregate({
       where: { userId, removedAt: null },
@@ -144,6 +167,43 @@ export const moneyRepository = {
   findMoneyEntryById(userId, id) {
     return prisma.moneyEntry.findFirst({
       where: { userId, id },
+    });
+  },
+
+  deleteCommitmentById(userId, id) {
+    return prisma.moneyCommitment.deleteMany({
+      where: {
+        id,
+        userId,
+      },
+    });
+  },
+
+  findCommitmentById(userId, id) {
+    return prisma.moneyCommitment.findFirst({
+      where: {
+        id,
+        userId,
+      },
+      include: commitmentInclude,
+    });
+  },
+
+  softDeleteEntriesByIds(userId, ids, removedReason, removedAt = new Date()) {
+    if (ids.length === 0) {
+      return { count: 0 };
+    }
+
+    return prisma.moneyEntry.updateMany({
+      where: {
+        userId,
+        id: { in: ids },
+        removedAt: null,
+      },
+      data: {
+        removedAt,
+        removedReason,
+      },
     });
   },
 };
