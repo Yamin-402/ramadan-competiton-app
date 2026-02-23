@@ -144,7 +144,7 @@ function formatAmountCell(item: AdminUserActivity): string {
   const enteredAmount = resolveEnteredAmount(item);
   const flowType = getTaskFlowType(item);
 
-  if (Number.isFinite(enteredAmount)) {
+  if (enteredAmount !== null && Number.isFinite(enteredAmount)) {
     if (flowType === "TIMED") {
       return `${toNumber(enteredAmount).toFixed(0)} min`;
     }
