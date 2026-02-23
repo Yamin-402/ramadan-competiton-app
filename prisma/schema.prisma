@@ -121,11 +121,14 @@ model Tag {
   id                  Int                       @id @default(autoincrement())
   key                 String                    @unique
   label               String
+  labelEn             String?
+  labelAr             String?
   isActive            Boolean                   @default(true)
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
   users               UserTag[]
   taskRequirements    TaskTagRequirement[]
+  categoryTasks       Task[]                    @relation("TaskCategoryTag")
   conditionTargets    TaskCondition[]           @relation("ConditionTargetTag")
   notificationTargets NotificationCampaignTag[]
 }
@@ -167,10 +170,12 @@ model Task {
   isPrivate        Boolean              @default(false)
   startsAt         DateTime?
   endsAt           DateTime?
+  categoryTagId    Int?
   createdById      Int?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   createdBy        User?                @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  categoryTag      Tag?                 @relation("TaskCategoryTag", fields: [categoryTagId], references: [id], onDelete: SetNull)
   tagRequirements  TaskTagRequirement[]
   dependencies     TaskDependency[]     @relation("TaskDependsOn")
   requiredBy       TaskDependency[]     @relation("TaskRequiredFor")
@@ -184,6 +189,7 @@ model Task {
 
   @@index([type, status])
   @@index([startsAt, endsAt])
+  @@index([categoryTagId])
 }
 
 model TaskTagRequirement {

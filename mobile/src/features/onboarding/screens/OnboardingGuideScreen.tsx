@@ -12,7 +12,7 @@ import { useSettingsStore } from "../../../store/settings-store";
 import { getLayoutPalette } from "../../../theme/layout-palette";
 
 type GuideMode = "first_login" | "replay";
-type GuideVisualKey = "overview" | "tasks" | "forbidden" | "daily" | "money" | "more";
+type GuideVisualKey = "overview" | "tasks" | "forbidden" | "daily" | "money" | "more" | "rewards";
 
 interface GuideRouteParams {
   mode?: GuideMode;
@@ -183,6 +183,22 @@ function GuideVisual({ visual, isArabic, colors, mode, t }: GuideVisualProps) {
     );
   }
 
+  if (visual === "rewards") {
+    return (
+      <View style={[styles.mockCard, mockCardStyle]}>
+        <View style={[styles.mockHeader, { flexDirection: direction }]}>
+          <Text style={[styles.mockHeaderTitle, { color: colors.textPrimary, textAlign: align }]}>
+            {t("guide.slide7Title")}
+          </Text>
+          <Ionicons name="trophy-outline" size={18} color={colors.gold} />
+        </View>
+        <Text style={[styles.mockTinyText, { color: colors.textSecondary, textAlign: align }]}>
+          {t("guide.slide7Body2")}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.mockCard, mockCardStyle]}>
       <Text style={[styles.mockHeaderTitle, { color: colors.textPrimary, textAlign: align }]}>
@@ -242,6 +258,7 @@ export function OnboardingGuideScreen() {
       { title: t("guide.slide4Title"), body: t("guide.slide4Body"), visual: "daily" },
       { title: t("guide.slide5Title"), body: t("guide.slide5Body"), visual: "money" },
       { title: t("guide.slide6Title"), body: t("guide.slide6Body"), visual: "more" },
+      { title: t("guide.slide7Title"), body: t("guide.slide7Body"), visual: "rewards" },
     ],
     [t]
   );

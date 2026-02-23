@@ -34,6 +34,15 @@ const taskListSelect = {
   endsAt: true,
   createdAt: true,
   config: true,
+  categoryTag: {
+    select: {
+      id: true,
+      key: true,
+      label: true,
+      labelEn: true,
+      labelAr: true,
+    },
+  },
   tagRequirements: {
     select: {
       tag: {
@@ -261,6 +270,7 @@ export const adminRepository = {
         isPrivate: true,
         startsAt: true,
         endsAt: true,
+        categoryTagId: true,
         config: true,
       },
     });
@@ -307,6 +317,20 @@ export const adminRepository = {
       select: {
         id: true,
         key: true,
+        isActive: true,
+      },
+    });
+  },
+
+  findTagById(tagId) {
+    return prisma.tag.findUnique({
+      where: { id: tagId },
+      select: {
+        id: true,
+        key: true,
+        label: true,
+        labelEn: true,
+        labelAr: true,
         isActive: true,
       },
     });
@@ -392,6 +416,7 @@ export const adminRepository = {
         isPrivate: payload.isPrivate,
         startsAt: payload.startsAt,
         endsAt: payload.endsAt,
+        categoryTagId: payload.categoryTagId,
         createdById: adminId,
         tagRequirements:
           payload.requiredTagIds.length > 0
@@ -437,10 +462,38 @@ export const adminRepository = {
             : undefined,
       },
       include: {
+        categoryTag: true,
         tagRequirements: true,
         dependencies: true,
         counterRules: true,
         conditions: true,
+      },
+    });
+  },
+
+  upsertTaskCategoryTag(payload) {
+    return prisma.tag.upsert({
+      where: { key: payload.key },
+      update: {
+        label: payload.label,
+        labelEn: payload.labelEn,
+        labelAr: payload.labelAr,
+        isActive: true,
+      },
+      create: {
+        key: payload.key,
+        label: payload.label,
+        labelEn: payload.labelEn,
+        labelAr: payload.labelAr,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        key: true,
+        label: true,
+        labelEn: true,
+        labelAr: true,
+        isActive: true,
       },
     });
   },

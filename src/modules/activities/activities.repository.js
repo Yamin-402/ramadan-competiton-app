@@ -1,6 +1,15 @@
 import { prisma } from "../../core/db/prisma.js";
 
 const taskInclude = {
+  categoryTag: {
+    select: {
+      id: true,
+      key: true,
+      label: true,
+      labelEn: true,
+      labelAr: true,
+    },
+  },
   tagRequirements: {
     select: {
       tagId: true,
@@ -225,6 +234,15 @@ export const activitiesRepository = {
             title: true,
             type: true,
             config: true,
+            categoryTag: {
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                labelEn: true,
+                labelAr: true,
+              },
+            },
           },
         },
         counterDeltas: {
@@ -256,6 +274,15 @@ export const activitiesRepository = {
             title: true,
             type: true,
             config: true,
+            categoryTag: {
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                labelEn: true,
+                labelAr: true,
+              },
+            },
           },
         },
         counterDeltas: {

@@ -166,6 +166,84 @@ function parseConditionalChildConfig(task) {
   };
 }
 
+function parseConditionalInlineConfig(task) {
+  const config = getConfigObject(task);
+  if (!config) {
+    return null;
+  }
+
+  const rawInlineTasks = Array.isArray(config.conditionalInlineTasks)
+    ? config.conditionalInlineTasks
+    : [];
+  const inlineTasks = rawInlineTasks
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+
+      const keyRaw = typeof item.key === "string" ? item.key : String(item.key || "");
+      const key = keyRaw.trim().toLowerCase();
+      if (!key) {
+        return null;
+      }
+
+      return {
+        key,
+        titleEn: typeof item.titleEn === "string" ? item.titleEn.trim() : null,
+        titleAr: typeof item.titleAr === "string" ? item.titleAr.trim() : null,
+      };
+    })
+    .filter(Boolean);
+
+  if (inlineTasks.length === 0) {
+    return null;
+  }
+
+  const rawTiers = Array.isArray(config.conditionalInlineRewardTiers)
+    ? config.conditionalInlineRewardTiers
+    : [];
+
+  const tiers = rawTiers
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+
+      const requiredCount = Math.floor(Number(item.requiredCount));
+      const points = Number(item.points);
+      if (!Number.isFinite(requiredCount) || requiredCount <= 0 || !Number.isFinite(points)) {
+        return null;
+      }
+
+      const requiredInlineTaskKeys = Array.isArray(item.requiredInlineTaskKeys)
+        ? Array.from(
+            new Set(
+              item.requiredInlineTaskKeys
+                .map((value) => String(value).trim().toLowerCase())
+                .filter(Boolean)
+            )
+          )
+        : [];
+
+      return {
+        requiredCount,
+        points,
+        requiredInlineTaskKeys,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.requiredCount - right.requiredCount);
+
+  if (tiers.length === 0) {
+    return null;
+  }
+
+  return {
+    tasks: inlineTasks,
+    tiers,
+  };
+}
+
 function isConditionalChildAutoAwardTask(task) {
   if (task.type !== "CONDITIONAL") {
     return false;
@@ -588,6 +666,31 @@ function evaluateConditionalTierPoints(tiers, completedTaskIdsSet, completedCoun
   return Number(points.toFixed(2));
 }
 
+function evaluateInlineTierPoints(tiers, selectedKeysSet, selectedCount) {
+  let points = 0;
+
+  for (const tier of tiers) {
+    if (selectedCount < tier.requiredCount) {
+      continue;
+    }
+
+    if (tier.requiredInlineTaskKeys.length > 0) {
+      const allRequiredPresent = tier.requiredInlineTaskKeys.every((key) =>
+        selectedKeysSet.has(key)
+      );
+      if (!allRequiredPresent) {
+        continue;
+      }
+    }
+
+    if (tier.points > points) {
+      points = tier.points;
+    }
+  }
+
+  return Number(points.toFixed(2));
+}
+
 async function maybeCreateConditionalChildBonusActivities({
   userId,
   sourceTaskId,
@@ -718,7 +821,46 @@ export const activitiesService = {
       ? await streaksService.getRewardMultiplierForNewActivity(userId, task.id, occurredAt)
       : 1;
     const pointUnits = resolvePointUnits(task, payload);
-    let basePoints = Number((Number(task.basePoints) * pointUnits).toFixed(2));
+    const activityMetadata =
+      payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
+        ? { ...payload.metadata }
+        : {};
+    const inlineConditionalConfig =
+      task.type === "CONDITIONAL" ? parseConditionalInlineConfig(task) : null;
+
+    let basePoints;
+    if (inlineConditionalConfig) {
+      const selectedInlineTaskKeys = Array.isArray(payload.metadata?.selectedInlineTaskKeys)
+        ? Array.from(
+            new Set(
+              payload.metadata.selectedInlineTaskKeys
+                .map((value) => String(value).trim().toLowerCase())
+                .filter(Boolean)
+            )
+          )
+        : [];
+
+      const validKeys = new Set(inlineConditionalConfig.tasks.map((item) => item.key));
+      const filteredSelectedKeys = selectedInlineTaskKeys.filter((key) => validKeys.has(key));
+
+      if (filteredSelectedKeys.length === 0) {
+        throw new AppError(400, "Select at least one minor task before completing this task");
+      }
+
+      const selectedKeysSet = new Set(filteredSelectedKeys);
+      const inlinePoints = evaluateInlineTierPoints(
+        inlineConditionalConfig.tiers,
+        selectedKeysSet,
+        filteredSelectedKeys.length
+      );
+      basePoints = Number(inlinePoints.toFixed(2));
+
+      activityMetadata.selectedInlineTaskKeys = filteredSelectedKeys;
+      activityMetadata.inlineSelectedCount = filteredSelectedKeys.length;
+    } else {
+      basePoints = Number((Number(task.basePoints) * pointUnits).toFixed(2));
+    }
+
     if (task.type === "FORBIDDEN") {
       basePoints = -Math.abs(basePoints);
     }
@@ -737,9 +879,10 @@ export const activitiesService = {
       effectivePoints,
       note: payload.note,
       metadata: {
-        ...(payload.metadata || {}),
+        ...activityMetadata,
         streakMultiplier,
         pointUnits,
+        activityAmount: typeof payload.amount === "number" ? payload.amount : null,
         isDuringFastingOverride: typeof payload.isDuringFasting === "boolean",
       },
       isForbidden: task.type === "FORBIDDEN",

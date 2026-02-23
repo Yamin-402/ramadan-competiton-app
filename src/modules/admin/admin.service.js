@@ -15,6 +15,20 @@ function normalizeUniqueKeys(values) {
   );
 }
 
+function normalizeCategoryTagKey(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  if (!slug) {
+    return null;
+  }
+
+  return `task_category:${slug}`;
+}
+
 function buildKeyMap(rows) {
   return new Map(rows.map((row) => [row.key, row.id]));
 }
@@ -308,6 +322,28 @@ export const adminService = {
     assertResolvedKeys(allTagKeys, tagMap, "tag");
     assertResolvedKeys(counterKeys, counterMap, "counter");
 
+    let categoryTagId;
+    if (payload.categoryTag) {
+      const normalizedKey = normalizeCategoryTagKey(payload.categoryTag.key);
+      if (!normalizedKey) {
+        throw new AppError(400, "Invalid category tag key");
+      }
+
+      const categoryTag = await adminRepository.upsertTaskCategoryTag({
+        key: normalizedKey,
+        label: payload.categoryTag.labelEn.trim(),
+        labelEn: payload.categoryTag.labelEn.trim(),
+        labelAr: payload.categoryTag.labelAr.trim(),
+      });
+      categoryTagId = categoryTag.id;
+    } else if (payload.categoryTagId) {
+      const categoryTag = await adminRepository.findTagById(payload.categoryTagId);
+      if (!categoryTag || !categoryTag.isActive || !categoryTag.key.startsWith("task_category:")) {
+        throw new AppError(400, "Unknown category tag id");
+      }
+      categoryTagId = categoryTag.id;
+    }
+
     const resolvedCounterRules = payload.counterRules.map((rule) => {
       if (rule.valueSource === "FIXED" && typeof rule.fixedDelta !== "number") {
         throw new AppError(400, "fixedDelta is required when counter rule valueSource is FIXED", {
@@ -348,6 +384,7 @@ export const adminService = {
         isPrivate: payload.type === "FORBIDDEN" ? true : Boolean(payload.isPrivate),
         startsAt,
         endsAt,
+        categoryTagId,
         requiredTagIds: requiredTagKeys.map((key) => tagMap.get(key)),
         dependencies: payload.dependencies,
         counterRules: resolvedCounterRules,
@@ -397,6 +434,30 @@ export const adminService = {
       requiredTagIds = requiredTagKeys.map((key) => tagMap.get(key));
     }
 
+    let categoryTagId;
+    if (payload.categoryTag === null || payload.categoryTagId === null) {
+      categoryTagId = null;
+    } else if (payload.categoryTag) {
+      const normalizedKey = normalizeCategoryTagKey(payload.categoryTag.key);
+      if (!normalizedKey) {
+        throw new AppError(400, "Invalid category tag key");
+      }
+
+      const categoryTag = await adminRepository.upsertTaskCategoryTag({
+        key: normalizedKey,
+        label: payload.categoryTag.labelEn.trim(),
+        labelEn: payload.categoryTag.labelEn.trim(),
+        labelAr: payload.categoryTag.labelAr.trim(),
+      });
+      categoryTagId = categoryTag.id;
+    } else if (payload.categoryTagId !== undefined) {
+      const categoryTag = await adminRepository.findTagById(payload.categoryTagId);
+      if (!categoryTag || !categoryTag.isActive || !categoryTag.key.startsWith("task_category:")) {
+        throw new AppError(400, "Unknown category tag id");
+      }
+      categoryTagId = categoryTag.id;
+    }
+
     const startsAt =
       payload.startsAt !== undefined ? toNullableDate(payload.startsAt, "startsAt") : undefined;
     const endsAt = payload.endsAt !== undefined ? toNullableDate(payload.endsAt, "endsAt") : undefined;
@@ -418,6 +479,7 @@ export const adminService = {
         ...(payload.status !== undefined ? { status: payload.status } : {}),
         ...(payload.basePoints !== undefined ? { basePoints: payload.basePoints } : {}),
         ...(payload.config !== undefined ? { config: payload.config } : {}),
+        ...(categoryTagId !== undefined ? { categoryTagId } : {}),
         ...(payload.isPrivate !== undefined || payload.type !== undefined
           ? {
               isPrivate: nextType === "FORBIDDEN" ? true : Boolean(payload.isPrivate),

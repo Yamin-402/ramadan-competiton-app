@@ -99,6 +99,70 @@ function getTaskTypeLabel(item: AdminUserActivity): string {
   return "Normal";
 }
 
+function getTaskFlowType(item: AdminUserActivity): string {
+  if (item.task?.config && typeof item.task.config === "object") {
+    const flow = (item.task.config as Record<string, unknown>).taskFlowType;
+    if (typeof flow === "string") {
+      return flow.trim().toUpperCase();
+    }
+  }
+  return "";
+}
+
+function resolveEnteredAmount(item: AdminUserActivity): number | null {
+  const metadata =
+    item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+      ? (item.metadata as Record<string, unknown>)
+      : null;
+  if (!metadata) {
+    return null;
+  }
+
+  const directAmount = Number(metadata.activityAmount);
+  if (Number.isFinite(directAmount)) {
+    return directAmount;
+  }
+
+  const pointUnits = Number(metadata.pointUnits);
+  if (!Number.isFinite(pointUnits)) {
+    return null;
+  }
+
+  const flowType = getTaskFlowType(item);
+  if (flowType === "TIMED") {
+    return pointUnits * 60;
+  }
+
+  if (item.task?.type === "COUNTER" || flowType === "COUNTER") {
+    return pointUnits;
+  }
+
+  return null;
+}
+
+function formatAmountCell(item: AdminUserActivity): string {
+  const enteredAmount = resolveEnteredAmount(item);
+  const flowType = getTaskFlowType(item);
+
+  if (Number.isFinite(enteredAmount)) {
+    if (flowType === "TIMED") {
+      return `${toNumber(enteredAmount).toFixed(0)} min`;
+    }
+    return toNumber(enteredAmount).toFixed(2);
+  }
+
+  if (item.counterDeltas.length > 0) {
+    return item.counterDeltas
+      .map(
+        (delta) =>
+          `${delta.counter.name}: ${toNumber(delta.delta).toFixed(2)}${delta.counter.unit ? ` ${delta.counter.unit}` : ""}`
+      )
+      .join(" | ");
+  }
+
+  return "-";
+}
+
 export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryModuleProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>(initialUserId ? String(initialUserId) : "");
   const [rows, setRows] = useState<AdminUserActivity[]>([]);
@@ -323,14 +387,7 @@ export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryM
                               <td>{getTaskTypeLabel(item)}</td>
                               <td>{item.isDuringFasting ? "During fasting" : "Outside fasting"}</td>
                               <td>
-                                {item.counterDeltas.length > 0
-                                  ? item.counterDeltas
-                                      .map(
-                                        (delta) =>
-                                          `${delta.counter.name}: ${toNumber(delta.delta).toFixed(2)}${delta.counter.unit ? ` ${delta.counter.unit}` : ""}`
-                                      )
-                                      .join(" | ")
-                                  : "-"}
+                                {formatAmountCell(item)}
                               </td>
                               <td>{formatSignedPoints(item.effectivePoints)}</td>
                             </tr>

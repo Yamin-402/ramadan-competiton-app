@@ -9,6 +9,7 @@ import { LoadingBlock } from "../../../components/LoadingBlock";
 import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
+import { formatPoints } from "../../../utils/format";
 import { MoreStackParamList } from "../../../app/navigation/types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "UserProfile">;
@@ -44,6 +45,12 @@ export function UserProfileScreen({ route }: Props) {
   const displayName = profile?.displayName || fallbackDisplayName || t("profile.userFallback");
   const bio = profile?.bio || null;
   const avatarUrl = profile?.avatarUrl || null;
+  const educationLabel =
+    profile?.educationLevel === "SCHOOL"
+      ? t("profile.educationSchool")
+      : profile?.educationLevel === "UNIVERSITY"
+        ? t("profile.educationUniversity")
+        : null;
   const initials = useMemo(
     () =>
       (displayName || "U")
@@ -69,6 +76,14 @@ export function UserProfileScreen({ route }: Props) {
           )}
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: colors.textPrimary, textAlign }]}>{displayName}</Text>
+            {educationLabel ? (
+              <Text style={[styles.bio, { color: colors.textSecondary, textAlign }]}>
+                {t("profile.educationLevel")}: {educationLabel}
+              </Text>
+            ) : null}
+            <Text style={[styles.bio, { color: colors.textSecondary, textAlign }]}>
+              {t("leaderboard.total")}: {formatPoints(profile?.totalPoints || 0)}
+            </Text>
           </View>
         </View>
       </AppCard>

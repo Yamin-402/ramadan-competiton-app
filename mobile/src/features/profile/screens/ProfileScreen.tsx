@@ -2,6 +2,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import { streaksApi } from "../../../api/endpoints/streaks.api";
 import { usersApi } from "../../../api/endpoints/users.api";
 import { getApiErrorMessage } from "../../../api/client";
@@ -205,20 +206,28 @@ export function ProfileScreen() {
       >
         <AppCard style={modernCardStyle}>
           <View style={styles.headerRow}>
-            <Pressable onPress={() => setAvatarModalVisible(true)}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
-                  <Text style={styles.avatarText}>{initials}</Text>
+            <Pressable onPress={() => setAvatarModalVisible(true)} style={styles.avatarPressable}>
+              <View>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
+                    <Text style={styles.avatarText}>{initials}</Text>
+                  </View>
+                )}
+                <View style={[styles.avatarBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Ionicons name="camera-outline" size={14} color={colors.textPrimary} />
                 </View>
-              )}
+              </View>
             </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.textPrimary }]}>
                 {displayName || user?.email || t("profile.userFallback")}
               </Text>
               <Text style={[styles.email, { color: colors.textSecondary }]}>{user?.email}</Text>
+              <Text style={[styles.photoHint, { color: colors.textSecondary }]}>
+                {t("profile.changePhotoHint")}
+              </Text>
               {educationLevel ? (
                 <Text style={[styles.email, { color: colors.textSecondary }]}>
                   {t("profile.educationLevel")}: {educationLevel}
@@ -273,59 +282,87 @@ export function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
             {t("profile.titleLayout")}
           </Text>
-          <View style={styles.themeOptions}>
-            {layoutOptions.map((option) => (
-              <AppButton
-                key={option}
-                label={
-                  option === "classic"
-                    ? t("profile.layoutClassic")
-                    : option === "ramadan_modern"
-                      ? t("profile.layoutRamadan")
-                      : t("profile.layoutModern")
-                }
-                variant={tasksDesignVariant === option ? "primary" : "ghost"}
-                onPress={() => setTasksDesignVariant(option)}
-              />
-            ))}
+          <View style={styles.optionPillsRow}>
+            {layoutOptions.map((option) => {
+              const selected = tasksDesignVariant === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setTasksDesignVariant(option)}
+                  style={[
+                    styles.optionPill,
+                    {
+                      borderColor: selected ? colors.gold : colors.border,
+                      backgroundColor: selected ? `${colors.gold}22` : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {option === "classic"
+                      ? t("profile.layoutClassic")
+                      : option === "ramadan_modern"
+                        ? t("profile.layoutRamadan")
+                        : t("profile.layoutModern")}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </AppCard>
 
-        <AppCard style={modernCardStyle}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
+          <Text style={[styles.sectionTitle, styles.subSectionTitle, { color: colors.textPrimary, textAlign }]}>
             {t("profile.titleTheme")}
           </Text>
-          <View style={styles.themeOptions}>
-            {themeOptions.map((option) => (
-              <AppButton
-                key={option}
-                label={
-                  option === "system"
-                    ? t("profile.themeSystem")
-                    : option === "light"
-                      ? t("profile.themeLight")
-                      : t("profile.themeDark")
-                }
-                variant={themePreference === option ? "primary" : "ghost"}
-                onPress={() => setThemePreference(option)}
-              />
-            ))}
+          <View style={styles.optionPillsRow}>
+            {themeOptions.map((option) => {
+              const selected = themePreference === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setThemePreference(option)}
+                  style={[
+                    styles.optionPill,
+                    {
+                      borderColor: selected ? colors.gold : colors.border,
+                      backgroundColor: selected ? `${colors.gold}22` : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {option === "system"
+                      ? t("profile.themeSystem")
+                      : option === "light"
+                        ? t("profile.themeLight")
+                        : t("profile.themeDark")}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </AppCard>
-        
-        <AppCard style={modernCardStyle}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
+
+          <Text style={[styles.sectionTitle, styles.subSectionTitle, { color: colors.textPrimary, textAlign }]}>
             {t("profile.titleLanguage")}
           </Text>
-          <View style={styles.themeOptions}>
-            {languageOptions.map((option) => (
-              <AppButton
-                key={option}
-                label={option === "en" ? t("profile.langEnglish") : t("profile.langArabic")}
-                variant={appLanguage === option ? "primary" : "ghost"}
-                onPress={() => setAppLanguage(option)}
-              />
-            ))}
+          <View style={styles.optionPillsRow}>
+            {languageOptions.map((option) => {
+              const selected = appLanguage === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setAppLanguage(option)}
+                  style={[
+                    styles.optionPill,
+                    {
+                      borderColor: selected ? colors.gold : colors.border,
+                      backgroundColor: selected ? `${colors.gold}22` : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {option === "en" ? t("profile.langEnglish") : t("profile.langArabic")}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </AppCard>
 
@@ -406,6 +443,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  avatarPressable: {
+    position: "relative",
+  },
   avatar: {
     width: 64,
     height: 64,
@@ -417,6 +457,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  avatarBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: {
     color: "#1a1607",
@@ -430,13 +481,28 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 13,
   },
+  photoHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
     marginBottom: 8,
   },
-  themeOptions: {
+  subSectionTitle: {
+    marginTop: 10,
+  },
+  optionPillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
+  },
+  optionPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   privacyRow: {
     flexDirection: "row",

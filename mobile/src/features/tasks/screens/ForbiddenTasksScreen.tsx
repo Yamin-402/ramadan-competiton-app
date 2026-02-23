@@ -191,10 +191,15 @@ export function ForbiddenTasksScreen() {
         <EmptyState title={t("forbidden.noTasksTitle")} subtitle={t("forbidden.noTasksSubtitle")} />
       ) : (
         tasks.map((task) => (
+          (() => {
+            const categoryValue = getTaskCategory(task, isArabic ? "ar" : "en");
+            return (
           <TaskItemCard
             key={task.id}
             task={task}
-            categoryLabel={getTaskCategory(task).toLowerCase() === "forbidden" ? t("tasks.categoryForbidden") : getTaskCategory(task)}
+            categoryLabel={
+              categoryValue.toLowerCase() === "forbidden" ? t("tasks.categoryForbidden") : categoryValue
+            }
             amountValue={amountByTaskId[task.id] || ""}
             onAmountChange={(value) => setAmountByTaskId((prev) => ({ ...prev, [task.id]: value }))}
             onLog={() => void handleLogForbidden(task)}
@@ -214,6 +219,8 @@ export function ForbiddenTasksScreen() {
               setFastingSelectionByTaskId((prev) => ({ ...prev, [task.id]: value }))
             }
           />
+            );
+          })()
         ))
       )}
     </ScreenContainer>

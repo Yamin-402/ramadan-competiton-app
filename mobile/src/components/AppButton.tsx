@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 import { useAppTheme } from "../hooks/use-app-theme";
 
 type ButtonVariant = "primary" | "ghost" | "danger";
@@ -8,7 +8,8 @@ interface AppButtonProps {
   onPress: () => void;
   disabled?: boolean;
   variant?: ButtonVariant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  labelColor?: string;
 }
 
 export function AppButton({
@@ -17,6 +18,7 @@ export function AppButton({
   disabled = false,
   variant = "primary",
   style,
+  labelColor,
 }: AppButtonProps) {
   const { colors } = useAppTheme();
 
@@ -52,7 +54,7 @@ export function AppButton({
         style,
       ]}
     >
-      <Text style={[styles.label, { color: variantStyle.textColor }]}>{label}</Text>
+      <Text style={[styles.label, { color: labelColor || variantStyle.textColor }]}>{label}</Text>
     </Pressable>
   );
 }

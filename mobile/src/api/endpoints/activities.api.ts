@@ -6,6 +6,7 @@ interface CreateTaskCompletionPayload {
   amount?: number;
   note?: string;
   isDuringFasting?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 interface FastingStatusResponse {

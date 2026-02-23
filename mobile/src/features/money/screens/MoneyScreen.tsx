@@ -240,7 +240,7 @@ export function MoneyScreen() {
                     {task.title}
                   </Text>
                   <Text style={{ color: active ? "#1d1809" : colors.textSecondary, fontSize: 12 }}>
-                    {forbidden ? t("money.prohibitedTask") : getTaskCategory(task)}
+                    {forbidden ? t("money.prohibitedTask") : getTaskCategory(task, isArabic ? "ar" : "en")}
                   </Text>
                 </Pressable>
               );

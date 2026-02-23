@@ -1,7 +1,6 @@
 import { PropsWithChildren, ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { NavigationProp, ParamListBase, useNavigation } from "@react-navigation/native";
-import { Edge, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Edge, SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "../hooks/use-app-theme";
 import { useSettingsStore } from "../store/settings-store";
 import { PatternBackground } from "./PatternBackground";
@@ -12,7 +11,6 @@ interface ScreenContainerProps extends PropsWithChildren {
   customBackground?: ReactNode;
   fixedOverlay?: ReactNode;
   safeAreaEdges?: Edge[];
-  withTabBarSpacing?: boolean;
   overlayTopSpacing?: number;
 }
 
@@ -24,28 +22,13 @@ export function ScreenContainer({
   useDefaultBackground = true,
   customBackground,
   fixedOverlay,
-  safeAreaEdges = ["top", "left", "right", "bottom"],
-  withTabBarSpacing,
+  safeAreaEdges = ["left", "right"],
   overlayTopSpacing = 0,
 }: ScreenContainerProps) {
   const { colors } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const variant = useSettingsStore((state) => state.tasksDesignVariant);
-  const navigation = useNavigation<NavigationProp<ParamListBase>>();
-  const hasTabParent = (() => {
-    let parent = navigation.getParent();
-    while (parent) {
-      if (parent.getState().type === "tab") {
-        return true;
-      }
-      parent = parent.getParent();
-    }
-    return false;
-  })();
-  const applyTabBarSpacing = withTabBarSpacing ?? hasTabParent;
   const contentPaddingTop = BASE_CONTENT_PADDING + Math.max(0, overlayTopSpacing);
-  const contentPaddingBottom =
-    BASE_CONTENT_PADDING + (applyTabBarSpacing ? Math.max(insets.bottom, 8) : 0);
+  const contentPaddingBottom = BASE_CONTENT_PADDING;
 
   return (
     <View style={styles.root}>

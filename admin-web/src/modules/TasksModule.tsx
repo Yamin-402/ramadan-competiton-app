@@ -30,6 +30,10 @@ interface TaskFormState {
   visibility: VisibilityType;
   flow: FlowType;
   audience: AudienceType;
+  categoryTagId: string;
+  categoryTagKey: string;
+  categoryTagLabelEn: string;
+  categoryTagLabelAr: string;
   streakEnabled: boolean;
   streakGoalDays: string;
   streakBonusPoints: string;
@@ -52,6 +56,15 @@ interface TaskFormState {
   conditionalPartialPoints: string;
   conditionalPartialRequiredTaskIds: string[];
   conditionalFullPoints: string;
+  conditionalInlineTasks: Array<{
+    key: string;
+    titleEn: string;
+    titleAr: string;
+  }>;
+  conditionalInlinePartialCount: string;
+  conditionalInlinePartialPoints: string;
+  conditionalInlinePartialRequiredKeys: string[];
+  conditionalInlineFullPoints: string;
 }
 
 const defaultForm: TaskFormState = {
@@ -62,6 +75,10 @@ const defaultForm: TaskFormState = {
   visibility: "NORMAL",
   flow: "NORMAL",
   audience: "ALL",
+  categoryTagId: "",
+  categoryTagKey: "",
+  categoryTagLabelEn: "",
+  categoryTagLabelAr: "",
   streakEnabled: false,
   streakGoalDays: "7",
   streakBonusPoints: "0",
@@ -84,6 +101,11 @@ const defaultForm: TaskFormState = {
   conditionalPartialPoints: "",
   conditionalPartialRequiredTaskIds: [],
   conditionalFullPoints: "",
+  conditionalInlineTasks: [],
+  conditionalInlinePartialCount: "",
+  conditionalInlinePartialPoints: "",
+  conditionalInlinePartialRequiredKeys: [],
+  conditionalInlineFullPoints: "",
 };
 
 function normalizeKey(text: string): string {
@@ -93,6 +115,16 @@ function normalizeKey(text: string): string {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   return normalized || `task_${Date.now()}`;
+}
+
+function normalizeCategoryTagKey(text: string): string {
+  const normalized = text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized || `category_${Date.now()}`;
 }
 
 function findTagKeyByKeywords(tags: Tag[], keywords: string[]): string | null {
@@ -243,8 +275,14 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [newInlineTaskEn, setNewInlineTaskEn] = useState("");
+  const [newInlineTaskAr, setNewInlineTaskAr] = useState("");
 
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => b.id - a.id), [tasks]);
+  const categoryTags = useMemo(
+    () => tags.filter((tag) => tag.key.startsWith("task_category:")),
+    [tags]
+  );
   const editingTask = useMemo(
     () => (editingTaskId ? tasks.find((task) => task.id === editingTaskId) || null : null),
     [editingTaskId, tasks]
@@ -264,6 +302,10 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
       visibility: task.type === "FORBIDDEN" ? "FORBIDDEN" : "NORMAL",
       flow: flowFromTask(task),
       audience: audienceFromTask(task),
+      categoryTagId: task.categoryTag ? String(task.categoryTag.id) : "",
+      categoryTagKey: "",
+      categoryTagLabelEn: "",
+      categoryTagLabelAr: "",
       streakEnabled: isStreakEnabled(task),
       streakGoalDays: String(task.config?.streakGoalDays ?? 7),
       streakBonusPoints: String(task.config?.streakBonusPoints ?? 0),
@@ -325,6 +367,74 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
               .sort((a, b) => b - a)[0] ?? ""
           )
         : "",
+      conditionalInlineTasks: Array.isArray(task.config?.conditionalInlineTasks)
+        ? task.config.conditionalInlineTasks
+            .map((item) => {
+              if (!item || typeof item !== "object" || Array.isArray(item)) {
+                return null;
+              }
+              const keyRaw = String((item as { key?: unknown }).key ?? "").trim();
+              const titleEn = String((item as { titleEn?: unknown }).titleEn ?? "").trim();
+              const titleAr = String((item as { titleAr?: unknown }).titleAr ?? "").trim();
+              if (!keyRaw || (!titleEn && !titleAr)) {
+                return null;
+              }
+              return {
+                key: keyRaw,
+                titleEn,
+                titleAr,
+              };
+            })
+            .filter(Boolean) as Array<{ key: string; titleEn: string; titleAr: string }>
+        : [],
+      conditionalInlinePartialCount: Array.isArray(task.config?.conditionalInlineRewardTiers)
+        ? String(
+            task.config.conditionalInlineRewardTiers
+              .map((tier) => Number((tier as { requiredCount?: unknown }).requiredCount))
+              .filter((value) => Number.isFinite(value))
+              .sort((a, b) => a - b)[0] || ""
+          )
+        : "",
+      conditionalInlinePartialPoints: Array.isArray(task.config?.conditionalInlineRewardTiers)
+        ? String(
+            task.config.conditionalInlineRewardTiers
+              .map((tier) => ({
+                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+                points: Number((tier as { points?: unknown }).points),
+                requiredInlineTaskKeys: Array.isArray((tier as { requiredInlineTaskKeys?: unknown }).requiredInlineTaskKeys)
+                  ? (tier as { requiredInlineTaskKeys?: unknown[] }).requiredInlineTaskKeys
+                      ?.map((value) => String(value))
+                      .filter(Boolean) || []
+                  : [],
+              }))
+              .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
+              .sort((a, b) => a.requiredCount - b.requiredCount)[0]?.points ?? ""
+          )
+        : "",
+      conditionalInlinePartialRequiredKeys: Array.isArray(task.config?.conditionalInlineRewardTiers)
+        ? (() => {
+            const firstTier = task.config.conditionalInlineRewardTiers
+              .map((tier) => ({
+                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+                requiredInlineTaskKeys: Array.isArray((tier as { requiredInlineTaskKeys?: unknown }).requiredInlineTaskKeys)
+                  ? (tier as { requiredInlineTaskKeys?: unknown[] }).requiredInlineTaskKeys
+                      ?.map((value) => String(value))
+                      .filter(Boolean) || []
+                  : [],
+              }))
+              .filter((tier) => Number.isFinite(tier.requiredCount))
+              .sort((a, b) => a.requiredCount - b.requiredCount)[0];
+            return firstTier?.requiredInlineTaskKeys || [];
+          })()
+        : [],
+      conditionalInlineFullPoints: Array.isArray(task.config?.conditionalInlineRewardTiers)
+        ? String(
+            task.config.conditionalInlineRewardTiers
+              .map((tier) => Number((tier as { points?: unknown }).points))
+              .filter((value) => Number.isFinite(value))
+              .sort((a, b) => b - a)[0] ?? ""
+          )
+        : "",
     });
     setEditingTaskId(task.id);
     setError(null);
@@ -333,7 +443,46 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
 
   const resetForm = () => {
     setForm(defaultForm);
+    setNewInlineTaskEn("");
+    setNewInlineTaskAr("");
     setEditingTaskId(null);
+  };
+
+  const addInlineTask = () => {
+    const titleEn = newInlineTaskEn.trim();
+    const titleAr = newInlineTaskAr.trim();
+    if (!titleEn && !titleAr) {
+      return;
+    }
+
+    const keySeed = titleEn || titleAr;
+    const key = normalizeCategoryTagKey(keySeed);
+    if (form.conditionalInlineTasks.some((item) => item.key === key)) {
+      setError("Inline task key already exists. Change the task title.");
+      return;
+    }
+
+    setField("conditionalInlineTasks", [
+      ...form.conditionalInlineTasks,
+      {
+        key,
+        titleEn,
+        titleAr,
+      },
+    ]);
+    setNewInlineTaskEn("");
+    setNewInlineTaskAr("");
+  };
+
+  const removeInlineTask = (key: string) => {
+    setField(
+      "conditionalInlineTasks",
+      form.conditionalInlineTasks.filter((item) => item.key !== key)
+    );
+    setField(
+      "conditionalInlinePartialRequiredKeys",
+      form.conditionalInlinePartialRequiredKeys.filter((item) => item !== key)
+    );
   };
 
   const submit = async (event: FormEvent) => {
@@ -378,6 +527,12 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         }
       }
 
+      if (form.flow === "CONDITIONAL" && form.conditionalInlineTasks.length > 0) {
+        if (!form.conditionalInlineFullPoints || Number(form.conditionalInlineFullPoints) <= 0) {
+          throw new Error("Inline minor-task full points must be greater than 0.");
+        }
+      }
+
       const audienceTagKeys = resolveAudienceTagKeys(tags, form.audience);
       if (form.audience !== "ALL" && audienceTagKeys.length === 0) {
         throw new Error("Audience tags were not found in current tags.");
@@ -389,6 +544,13 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           : form.flow === "TIMED"
             ? "COUNTER"
             : form.flow;
+
+      const hasNewCategoryTag =
+        form.categoryTagLabelEn.trim().length > 0 || form.categoryTagLabelAr.trim().length > 0;
+      if (hasNewCategoryTag && (!form.categoryTagLabelEn.trim() || !form.categoryTagLabelAr.trim())) {
+        throw new Error("New category tag needs both English and Arabic labels.");
+      }
+
       const config = {
         taskVisibility: form.visibility,
         taskFlowType: form.flow,
@@ -437,6 +599,36 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                   : []),
               ]
             : [],
+        conditionalInlineTasks:
+          form.flow === "CONDITIONAL"
+            ? form.conditionalInlineTasks.map((item) => ({
+                key: item.key,
+                titleEn: item.titleEn,
+                titleAr: item.titleAr,
+              }))
+            : [],
+        conditionalInlineRewardTiers:
+          form.flow === "CONDITIONAL"
+            ? [
+                ...(form.conditionalInlinePartialCount && form.conditionalInlinePartialPoints
+                  ? [
+                      {
+                        requiredCount: Number(form.conditionalInlinePartialCount),
+                        points: Number(form.conditionalInlinePartialPoints),
+                        requiredInlineTaskKeys: form.conditionalInlinePartialRequiredKeys,
+                      },
+                    ]
+                  : []),
+                ...(form.conditionalInlineTasks.length > 0 && form.conditionalInlineFullPoints
+                  ? [
+                      {
+                        requiredCount: form.conditionalInlineTasks.length,
+                        points: Number(form.conditionalInlineFullPoints),
+                      },
+                    ]
+                  : []),
+              ]
+            : [],
       };
 
       const payload = {
@@ -449,6 +641,14 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         isPrivate: form.visibility === "FORBIDDEN",
         startsAt: form.startsAt.trim() || undefined,
         endsAt: form.endsAt.trim() || undefined,
+        categoryTagId: form.categoryTagId ? Number(form.categoryTagId) : undefined,
+        categoryTag: hasNewCategoryTag
+          ? {
+              key: normalizeCategoryTagKey(form.categoryTagKey || form.categoryTagLabelEn),
+              labelEn: form.categoryTagLabelEn.trim(),
+              labelAr: form.categoryTagLabelAr.trim(),
+            }
+          : undefined,
         requiredTagKeys: audienceTagKeys,
       };
 
@@ -458,6 +658,12 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           description: form.description.trim() || null,
           startsAt: form.startsAt.trim() || null,
           endsAt: form.endsAt.trim() || null,
+          categoryTagId:
+            hasNewCategoryTag
+              ? undefined
+              : form.categoryTagId
+                ? Number(form.categoryTagId)
+                : null,
         });
         setSuccess("Task updated.");
       } else {
@@ -573,6 +779,65 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
               <option value="SCHOOL_EGYPTIAN">School - Egyptian</option>
               <option value="SCHOOL_FOREIGN">School - Foreign</option>
             </select>
+          </label>
+
+          <label>
+            Task Category Tag (optional)
+            <select
+              value={form.categoryTagId}
+              onChange={(e) => {
+                setField("categoryTagId", e.target.value);
+                if (e.target.value) {
+                  setField("categoryTagKey", "");
+                  setField("categoryTagLabelEn", "");
+                  setField("categoryTagLabelAr", "");
+                }
+              }}
+            >
+              <option value="">No category tag</option>
+              {categoryTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {(tag.labelEn || tag.label || tag.key)} {tag.labelAr ? `| ${tag.labelAr}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            New Category (EN, optional)
+            <input
+              value={form.categoryTagLabelEn}
+              onChange={(e) => {
+                setField("categoryTagLabelEn", e.target.value);
+                if (e.target.value.trim()) {
+                  setField("categoryTagId", "");
+                }
+              }}
+              placeholder="e.g. Quran"
+            />
+          </label>
+
+          <label>
+            New Category (AR, optional)
+            <input
+              value={form.categoryTagLabelAr}
+              onChange={(e) => {
+                setField("categoryTagLabelAr", e.target.value);
+                if (e.target.value.trim()) {
+                  setField("categoryTagId", "");
+                }
+              }}
+              placeholder="مثال: قرآن"
+            />
+          </label>
+
+          <label>
+            New Category Key (optional)
+            <input
+              value={form.categoryTagKey}
+              onChange={(e) => setField("categoryTagKey", e.target.value)}
+              placeholder="quran"
+            />
           </label>
 
           <label className="checkbox-label">
@@ -823,6 +1088,110 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                 />
               </label>
 
+              <label className="form-grid__full">
+                Inline minor tasks (shown under this parent task only)
+                <div className="inline-grid">
+                  <div className="form-grid">
+                    <label>
+                      Minor task (EN)
+                      <input
+                        value={newInlineTaskEn}
+                        onChange={(e) => setNewInlineTaskEn(e.target.value)}
+                        placeholder="e.g. Read one hizb"
+                      />
+                    </label>
+                    <label>
+                      Minor task (AR)
+                      <input
+                        value={newInlineTaskAr}
+                        onChange={(e) => setNewInlineTaskAr(e.target.value)}
+                        placeholder="مثال: قراءة جزء"
+                      />
+                    </label>
+                  </div>
+                  <div className="inline-form">
+                    <button type="button" onClick={addInlineTask}>
+                      Add minor task
+                    </button>
+                  </div>
+                  <div className="chip-row">
+                    {form.conditionalInlineTasks.map((item) => (
+                      <button
+                        key={`inline-${item.key}`}
+                        type="button"
+                        className="chip chip--active"
+                        onClick={() => removeInlineTask(item.key)}
+                        title="Click to remove"
+                      >
+                        {(item.titleEn || item.titleAr || item.key)} {item.titleAr && item.titleEn ? `| ${item.titleAr}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </label>
+
+              {form.conditionalInlineTasks.length > 0 ? (
+                <>
+                  <label>
+                    Inline partial reward count (optional)
+                    <input
+                      value={form.conditionalInlinePartialCount}
+                      onChange={(e) => setField("conditionalInlinePartialCount", e.target.value)}
+                      type="number"
+                      min={1}
+                    />
+                  </label>
+
+                  <label>
+                    Inline partial reward points (optional)
+                    <input
+                      value={form.conditionalInlinePartialPoints}
+                      onChange={(e) => setField("conditionalInlinePartialPoints", e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min={0}
+                    />
+                  </label>
+
+                  <label className="form-grid__full">
+                    Inline partial reward requires specific minor tasks (optional)
+                    <div className="chip-row">
+                      {form.conditionalInlineTasks.map((item) => {
+                        const checked = form.conditionalInlinePartialRequiredKeys.includes(item.key);
+                        return (
+                          <button
+                            key={`inline-required-${item.key}`}
+                            type="button"
+                            className={`chip ${checked ? "chip--active" : ""}`}
+                            onClick={() =>
+                              setField(
+                                "conditionalInlinePartialRequiredKeys",
+                                checked
+                                  ? form.conditionalInlinePartialRequiredKeys.filter((key) => key !== item.key)
+                                  : [...form.conditionalInlinePartialRequiredKeys, item.key]
+                              )
+                            }
+                          >
+                            {item.titleEn || item.titleAr || item.key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </label>
+
+                  <label>
+                    Inline full reward points (all minor tasks)
+                    <input
+                      value={form.conditionalInlineFullPoints}
+                      onChange={(e) => setField("conditionalInlineFullPoints", e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min={0}
+                    />
+                  </label>
+                </>
+              ) : null}
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -889,6 +1258,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                 <th>Visibility</th>
                 <th>Flow</th>
                 <th>Audience</th>
+                <th>Category</th>
                 <th>Daily Completion</th>
                 <th>Streak</th>
                 <th>Points</th>
@@ -904,6 +1274,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                   <td>{task.type === "FORBIDDEN" ? "Forbidden" : "Normal"}</td>
                   <td>{flowFromTask(task)}</td>
                   <td>{audienceLabel(audienceFromTask(task))}</td>
+                  <td>{task.categoryTag?.labelEn || task.categoryTag?.label || "-"}</td>
                   <td>{completionPolicyLabel(task)}</td>
                   <td>{isStreakEnabled(task) ? "Yes" : "No"}</td>
                   <td>{String(task.basePoints)}</td>

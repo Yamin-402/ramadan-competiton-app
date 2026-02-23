@@ -7,6 +7,11 @@ const conditionTypeSchema = z.enum(["TASK_COMPLETIONS", "COUNTER_TOTAL", "STREAK
 const conditionOperatorSchema = z.enum(["EQ", "NEQ", "GT", "GTE", "LT", "LTE"]);
 const notificationTargetTypeSchema = z.enum(["ALL_USERS", "TAGS", "USER_IDS"]);
 const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"]);
+const categoryTagSchema = z.object({
+  key: z.string().min(1),
+  labelEn: z.string().min(1),
+  labelAr: z.string().min(1),
+});
 
 export const createCounterSchema = z.object({
   key: z.string().min(2),
@@ -60,6 +65,8 @@ export const createTaskSchema = z.object({
   isPrivate: z.boolean().optional(),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
+  categoryTagId: z.number().int().positive().optional(),
+  categoryTag: categoryTagSchema.optional(),
   requiredTagKeys: z.array(z.string().min(1)).default([]),
   dependencies: z
     .array(
@@ -106,6 +113,8 @@ export const updateTaskSchema = z.object({
   isPrivate: z.boolean().optional(),
   startsAt: z.string().datetime().optional().nullable(),
   endsAt: z.string().datetime().optional().nullable(),
+  categoryTagId: z.number().int().positive().optional().nullable(),
+  categoryTag: categoryTagSchema.optional().nullable(),
   requiredTagKeys: z.array(z.string().min(1)).optional(),
 });
 

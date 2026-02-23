@@ -32,6 +32,9 @@ interface TaskItemCardProps {
   fastingSelection: FastingSelection;
   onFastingSelectionChange: (value: FastingSelection) => void;
   completedToday?: boolean;
+  inlineTasks?: Array<{ key: string; label: string }>;
+  selectedInlineTaskKeys?: string[];
+  onToggleInlineTaskKey?: (key: string) => void;
 }
 
 function getTypeLabel(task: Task, interactionKind: TaskInteractionKind, t: ReturnType<typeof useI18n>["t"]) {
@@ -60,6 +63,9 @@ export function TaskItemCard({
   fastingSelection,
   onFastingSelectionChange,
   completedToday = false,
+  inlineTasks = [],
+  selectedInlineTaskKeys = [],
+  onToggleInlineTaskKey,
 }: TaskItemCardProps) {
   const { colors } = useAppTheme();
   const { t } = useI18n();
@@ -152,6 +158,34 @@ export function TaskItemCard({
         </View>
       ) : null}
 
+      {inlineTasks.length > 0 ? (
+        <View style={styles.inlineTasksWrap}>
+          <Text style={[styles.inlineTasksLabel, { color: colors.textSecondary }]}>{t("tasks.inlineMinorTasks")}</Text>
+          <View style={styles.inlineTasksRow}>
+            {inlineTasks.map((item) => {
+              const checked = selectedInlineTaskKeys.includes(item.key);
+              return (
+                <Pressable
+                  key={item.key}
+                  onPress={() => onToggleInlineTaskKey?.(item.key)}
+                  style={[
+                    styles.inlineTaskChip,
+                    {
+                      borderColor: checked ? colors.gold : colors.border,
+                      backgroundColor: checked ? `${colors.gold}22` : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={{ color: checked ? colors.textPrimary : colors.textSecondary, fontWeight: "700" }}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
       <FastingSelectionToggle value={fastingSelection} onChange={onFastingSelectionChange} />
 
       {showAmount ? (
@@ -229,5 +263,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     includeFontPadding: false,
     overflow: "hidden",
+  },
+  inlineTasksWrap: {
+    gap: 6,
+  },
+  inlineTasksLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  inlineTasksRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  inlineTaskChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
 });

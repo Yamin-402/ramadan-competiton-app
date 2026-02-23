@@ -167,7 +167,18 @@ export function getDailyCompletionLimit(task: Task): number | null {
   return 1;
 }
 
-export function getTaskCategory(task: Task): string {
+export function getTaskCategory(task: Task, language: "ar" | "en" = "en"): string {
+  const categoryTag = task.categoryTag;
+  if (categoryTag) {
+    const localizedLabel =
+      language === "ar"
+        ? categoryTag.labelAr || categoryTag.label
+        : categoryTag.labelEn || categoryTag.label;
+    if (typeof localizedLabel === "string" && localizedLabel.trim().length > 0) {
+      return localizedLabel.trim();
+    }
+  }
+
   const configKeys = ["category", "categoryLabel", "categoryKey", "group", "section"];
   for (const key of configKeys) {
     const value = getConfigString(task, key);
@@ -184,7 +195,7 @@ export function getTaskCategory(task: Task): string {
     return "Study";
   }
 
-  return "Prayers";
+  return "Other";
 }
 
 export function getTaskInteractionKind(task: Task): TaskInteractionKind {
@@ -199,6 +210,47 @@ export function getTaskInteractionKind(task: Task): TaskInteractionKind {
   }
 
   return "YES_NO";
+}
+
+export function getConditionalInlineTasks(
+  task: Task,
+  language: "ar" | "en" = "en"
+): Array<{ key: string; label: string }> {
+  if (!isConditionalTask(task)) {
+    return [];
+  }
+
+  const raw = task.config?.conditionalInlineTasks;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+
+      const keyRaw = typeof item.key === "string" ? item.key : String(item.key || "");
+      const key = keyRaw.trim().toLowerCase();
+      if (!key) {
+        return null;
+      }
+
+      const labelSource =
+        language === "ar"
+          ? (item.titleAr as string | undefined) || (item.titleEn as string | undefined)
+          : (item.titleEn as string | undefined) || (item.titleAr as string | undefined);
+      const label = typeof labelSource === "string" && labelSource.trim().length > 0
+        ? labelSource.trim()
+        : normalizeLabel(key);
+
+      return {
+        key,
+        label,
+      };
+    })
+    .filter((item): item is { key: string; label: string } => Boolean(item));
 }
 
 export function getTaskTypeLabel(task: Task): string {

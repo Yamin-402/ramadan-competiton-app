@@ -13,6 +13,8 @@ export interface Tag {
   id: number;
   key: string;
   label: string;
+  labelEn?: string | null;
+  labelAr?: string | null;
 }
 
 export interface UserTag {
@@ -65,6 +67,8 @@ export interface Task {
   status: TaskStatus;
   basePoints: number | string;
   isPrivate: boolean;
+  createdAt?: string;
+  categoryTag?: Tag | null;
   config?: Record<string, unknown> | null;
   counterRules: TaskCounterRule[];
   dependencies: TaskDependency[];
@@ -210,6 +214,8 @@ export interface PublicUserProfile {
   bio: string | null;
   avatarUrl?: string | null;
   isStreakPublic: boolean;
+  educationLevel?: "SCHOOL" | "UNIVERSITY" | null;
+  totalPoints?: number | string;
   streakSummary: {
     activeStreaks: number;
     bestCurrentStreak: number;

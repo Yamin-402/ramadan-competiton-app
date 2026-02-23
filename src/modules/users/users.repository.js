@@ -73,21 +73,46 @@ export const usersRepository = {
   },
 
   async findPublicProfileById(viewerUserId, targetUserId) {
-    const user = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: {
-        id: true,
-        displayName: true,
-        bio: true,
-        avatarUrl: true,
-        isStreakPublic: true,
-        isActive: true,
-      },
-    });
+    const [user, pointsAggregate] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: {
+          id: true,
+          displayName: true,
+          bio: true,
+          avatarUrl: true,
+          isStreakPublic: true,
+          isActive: true,
+          tags: {
+            select: {
+              tag: {
+                select: {
+                  key: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.activity.aggregate({
+        where: { userId: targetUserId },
+        _sum: {
+          effectivePoints: true,
+        },
+      }),
+    ]);
 
     if (!user || !user.isActive) {
       return null;
     }
+
+    const tagKeys = (user.tags || []).map((item) => item.tag.key.toLowerCase());
+    const educationLevel = tagKeys.some((key) => key.includes("school"))
+      ? "SCHOOL"
+      : tagKeys.some((key) => key.includes("university") || key.includes("uni"))
+        ? "UNIVERSITY"
+        : null;
+    const totalPoints = Number(pointsAggregate._sum.effectivePoints || 0);
 
     const canShowStreak = viewerUserId === user.id || user.isStreakPublic;
     if (!canShowStreak) {
@@ -97,6 +122,8 @@ export const usersRepository = {
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         isStreakPublic: user.isStreakPublic,
+        educationLevel,
+        totalPoints,
         streakSummary: null,
       };
     }
@@ -123,6 +150,8 @@ export const usersRepository = {
       bio: user.bio,
       avatarUrl: user.avatarUrl,
       isStreakPublic: user.isStreakPublic,
+      educationLevel,
+      totalPoints,
       streakSummary: {
         activeStreaks: activeCount,
         bestCurrentStreak: maxValues._max.currentStreak || 0,

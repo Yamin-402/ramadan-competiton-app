@@ -1,5 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Image, ImageSourcePropType, StyleSheet, View } from "react-native";
+import { Image, ImageSourcePropType, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DailyQuestionsScreen } from "../../features/daily-questions/screens/DailyQuestionsScreen";
 import { ForbiddenTasksScreen } from "../../features/tasks/screens/ForbiddenTasksScreen";
@@ -28,8 +28,8 @@ export function MainTabsNavigator() {
   const insets = useSafeAreaInsets();
   const variant = useSettingsStore((state) => state.tasksDesignVariant);
   const palette = getLayoutPalette(variant, colors, mode);
-  const tabBarBottomInset = insets.bottom > 0 ? insets.bottom : 16;
-  const tabBarHeight = 62 + tabBarBottomInset;
+  const tabBarBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 14 : 8);
+  const tabBarHeight = 56 + tabBarBottomInset;
 
   return (
     <Tab.Navigator
@@ -45,12 +45,13 @@ export function MainTabsNavigator() {
           backgroundColor: palette.bottomNavBackground,
           borderTopColor: palette.bottomNavBorder,
           height: tabBarHeight,
-          paddingTop: 6,
-          paddingBottom: tabBarBottomInset + 2,
+          paddingTop: 0,
+          paddingBottom: tabBarBottomInset,
           borderTopWidth: 1,
         },
         tabBarItemStyle: {
-          paddingTop: 2,
+          paddingTop: 0,
+          paddingBottom: 0,
         },
         tabBarLabelPosition: "below-icon",
         tabBarActiveTintColor: palette.tabActive,
@@ -58,8 +59,8 @@ export function MainTabsNavigator() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "700",
-          lineHeight: 13,
-          marginTop: 2,
+          lineHeight: 12,
+          marginTop: 1,
           marginBottom: 0,
         },
         tabBarIconStyle: {

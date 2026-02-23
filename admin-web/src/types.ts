@@ -23,6 +23,8 @@ export interface Tag {
   id: number;
   key: string;
   label: string;
+  labelEn?: string | null;
+  labelAr?: string | null;
   isActive: boolean;
 }
 
@@ -39,6 +41,13 @@ export interface AdminTask {
   endsAt: string | null;
   createdAt: string;
   config?: Record<string, unknown> | null;
+  categoryTag?: {
+    id: number;
+    key: string;
+    label: string;
+    labelEn?: string | null;
+    labelAr?: string | null;
+  } | null;
   tagRequirements?: Array<{
     tag: {
       key: string;
@@ -158,6 +167,7 @@ export interface AdminUserActivity {
   basePoints: string | number;
   effectivePoints: string | number;
   note: string | null;
+  metadata?: Record<string, unknown> | null;
   isForbidden: boolean;
   task: {
     id: number;
@@ -206,6 +216,12 @@ export interface TaskCreatePayload {
   isPrivate?: boolean;
   startsAt?: string;
   endsAt?: string;
+  categoryTagId?: number;
+  categoryTag?: {
+    key: string;
+    labelEn: string;
+    labelAr: string;
+  };
   requiredTagKeys: string[];
   dependencies: Array<{
     dependsOnTaskId: number;

@@ -22,6 +22,7 @@ import { pointsEvents } from "../../../events/points-events";
 import {
   getStreakDaysLeft,
   getStreakGoalDays,
+  getConditionalInlineTasks,
   getTaskCategory,
   getDailyCompletionLimit,
   getTaskInteractionKind,
@@ -140,7 +141,7 @@ function ModernTimingToggle({
 
 export function TasksScreen() {
   const { colors } = useAppTheme();
-  const { t } = useI18n();
+  const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -150,6 +151,9 @@ export function TasksScreen() {
     getDefaultFastingSelection()
   );
   const [todayCompletionCountByTaskId, setTodayCompletionCountByTaskId] = useState<Record<number, number>>({});
+  const [selectedInlineTaskKeysByTaskId, setSelectedInlineTaskKeysByTaskId] = useState<
+    Record<number, string[]>
+  >({});
   const [fastingSelectionByTaskId, setFastingSelectionByTaskId] = useState<
     Record<number, FastingSelection>
   >({});
@@ -172,7 +176,17 @@ export function TasksScreen() {
         activitiesApi.getFastingStatus(),
         activitiesApi.getTodayTaskStatus(),
       ]);
-      const visibleTasks = allTasks.filter((task) => task.type !== "FORBIDDEN");
+      const visibleTasks = allTasks
+        .filter((task) => task.type !== "FORBIDDEN")
+        .sort((left, right) => {
+          const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : Number.NaN;
+          const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : Number.NaN;
+          if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+            return leftTime - rightTime;
+          }
+
+          return left.id - right.id;
+        });
       const nextDefaultSelection = fastingStatus.isDuringFasting ? "FASTING" : "IFTAR";
       setDefaultFastingSelection(nextDefaultSelection);
       setTasks(visibleTasks);
@@ -192,6 +206,16 @@ export function TasksScreen() {
         }
         return next;
       });
+      setSelectedInlineTaskKeysByTaskId((current) => {
+        const next: Record<number, string[]> = {};
+        for (const task of visibleTasks) {
+          const options = getConditionalInlineTasks(task, isArabic ? "ar" : "en");
+          const allowed = new Set(options.map((item) => item.key));
+          const existing = current[task.id] || [];
+          next[task.id] = existing.filter((key) => allowed.has(key));
+        }
+        return next;
+      });
 
       const nextStreakMap: Record<number, number> = {};
       for (const streak of streaks) {
@@ -199,7 +223,9 @@ export function TasksScreen() {
       }
       setStreakByTaskId(nextStreakMap);
 
-      const nextCategories = new Set(visibleTasks.map((task) => getTaskCategory(task)));
+      const nextCategories = new Set(
+        visibleTasks.map((task) => getTaskCategory(task, isArabic ? "ar" : "en"))
+      );
       setSelectedCategory((current) =>
         current !== ALL_CATEGORY && !nextCategories.has(current) ? ALL_CATEGORY : current
       );
@@ -208,7 +234,7 @@ export function TasksScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isArabic]);
 
   useFocusEffect(
     useCallback(() => {
@@ -244,6 +270,8 @@ export function TasksScreen() {
     const requiresAmount = requiresActivityAmount(task);
     const amountRaw = amountByTaskId[task.id]?.trim() || "";
     const fastingSelection = fastingSelectionByTaskId[task.id] || defaultFastingSelection;
+    const inlineTaskOptions = getConditionalInlineTasks(task, isArabic ? "ar" : "en");
+    const selectedInlineTaskKeys = selectedInlineTaskKeysByTaskId[task.id] || [];
 
     let parsedAmount: number | undefined;
     if (requiresAmount) {
@@ -259,12 +287,23 @@ export function TasksScreen() {
       parsedAmount = value;
     }
 
+    if (inlineTaskOptions.length > 0 && selectedInlineTaskKeys.length === 0) {
+      setError(t("tasks.inlineSelectRequired"));
+      return;
+    }
+
     setSubmittingTaskId(task.id);
     try {
       const activity = await activitiesApi.createTaskCompletion({
         taskId: task.id,
         amount: parsedAmount,
         isDuringFasting: toIsDuringFasting(fastingSelection),
+        metadata:
+          inlineTaskOptions.length > 0
+            ? {
+                selectedInlineTaskKeys,
+              }
+            : undefined,
       });
       setTodayCompletionCountByTaskId((prev) => ({ ...prev, [task.id]: (prev[task.id] || 0) + 1 }));
       setSuccessMessage(
@@ -289,16 +328,16 @@ export function TasksScreen() {
   };
 
   const categories = useMemo(
-    () => [ALL_CATEGORY, ...Array.from(new Set(tasks.map((task) => getTaskCategory(task))))],
-    [tasks]
+    () => [ALL_CATEGORY, ...Array.from(new Set(tasks.map((task) => getTaskCategory(task, isArabic ? "ar" : "en"))))],
+    [isArabic, tasks]
   );
 
   const filteredTasks = useMemo(() => {
     if (selectedCategory === ALL_CATEGORY) {
       return tasks;
     }
-    return tasks.filter((task) => getTaskCategory(task) === selectedCategory);
-  }, [selectedCategory, tasks]);
+    return tasks.filter((task) => getTaskCategory(task, isArabic ? "ar" : "en") === selectedCategory);
+  }, [isArabic, selectedCategory, tasks]);
 
   const streakSummary = useMemo(() => {
     const streakValues = Object.values(streakByTaskId);
@@ -312,6 +351,7 @@ export function TasksScreen() {
       {tasksDesignVariant === "classic" ? (
         <ClassicTasksView
           colors={colors}
+          isArabic={isArabic}
           loading={loading}
           error={error}
           categories={categories}
@@ -322,10 +362,21 @@ export function TasksScreen() {
           streakByTaskId={streakByTaskId}
           amountByTaskId={amountByTaskId}
           todayCompletionCountByTaskId={todayCompletionCountByTaskId}
+          selectedInlineTaskKeysByTaskId={selectedInlineTaskKeysByTaskId}
           fastingSelectionByTaskId={fastingSelectionByTaskId}
           defaultFastingSelection={defaultFastingSelection}
           onAmountByTaskIdChange={setAmountByTaskId}
           onFastingSelectionChange={setFastingSelectionByTaskId}
+          onToggleInlineTaskKey={(taskId, key) =>
+            setSelectedInlineTaskKeysByTaskId((prev) => {
+              const current = prev[taskId] || [];
+              const hasKey = current.includes(key);
+              return {
+                ...prev,
+                [taskId]: hasKey ? current.filter((item) => item !== key) : [...current, key],
+              };
+            })
+          }
           onLogTask={handleLogTask}
           submittingTaskId={submittingTaskId}
           successMessage={successMessage}
@@ -337,6 +388,7 @@ export function TasksScreen() {
       {tasksDesignVariant === "ramadan_modern" ? (
         <RamadanModernTasksView
           colors={colors}
+          isArabic={isArabic}
           loading={loading}
           error={error}
           categories={categories}
@@ -347,10 +399,21 @@ export function TasksScreen() {
           streakByTaskId={streakByTaskId}
           amountByTaskId={amountByTaskId}
           todayCompletionCountByTaskId={todayCompletionCountByTaskId}
+          selectedInlineTaskKeysByTaskId={selectedInlineTaskKeysByTaskId}
           fastingSelectionByTaskId={fastingSelectionByTaskId}
           defaultFastingSelection={defaultFastingSelection}
           onAmountByTaskIdChange={setAmountByTaskId}
           onFastingSelectionChange={setFastingSelectionByTaskId}
+          onToggleInlineTaskKey={(taskId, key) =>
+            setSelectedInlineTaskKeysByTaskId((prev) => {
+              const current = prev[taskId] || [];
+              const hasKey = current.includes(key);
+              return {
+                ...prev,
+                [taskId]: hasKey ? current.filter((item) => item !== key) : [...current, key],
+              };
+            })
+          }
           onLogTask={handleLogTask}
           submittingTaskId={submittingTaskId}
           successMessage={successMessage}
@@ -362,6 +425,7 @@ export function TasksScreen() {
       {tasksDesignVariant === "modern" ? (
         <ModernTasksView
           colors={colors}
+          isArabic={isArabic}
           loading={loading}
           error={error}
           categories={categories}
@@ -372,10 +436,21 @@ export function TasksScreen() {
           streakByTaskId={streakByTaskId}
           amountByTaskId={amountByTaskId}
           todayCompletionCountByTaskId={todayCompletionCountByTaskId}
+          selectedInlineTaskKeysByTaskId={selectedInlineTaskKeysByTaskId}
           fastingSelectionByTaskId={fastingSelectionByTaskId}
           defaultFastingSelection={defaultFastingSelection}
           onAmountByTaskIdChange={setAmountByTaskId}
           onFastingSelectionChange={setFastingSelectionByTaskId}
+          onToggleInlineTaskKey={(taskId, key) =>
+            setSelectedInlineTaskKeysByTaskId((prev) => {
+              const current = prev[taskId] || [];
+              const hasKey = current.includes(key);
+              return {
+                ...prev,
+                [taskId]: hasKey ? current.filter((item) => item !== key) : [...current, key],
+              };
+            })
+          }
           onLogTask={handleLogTask}
           submittingTaskId={submittingTaskId}
           successMessage={successMessage}
@@ -389,6 +464,7 @@ export function TasksScreen() {
 
 interface TasksViewProps {
   colors: ReturnType<typeof useAppTheme>["colors"];
+  isArabic: boolean;
   loading: boolean;
   error: string | null;
   categories: string[];
@@ -402,10 +478,12 @@ interface TasksViewProps {
   streakByTaskId: Record<number, number>;
   amountByTaskId: Record<number, string>;
   todayCompletionCountByTaskId: Record<number, number>;
+  selectedInlineTaskKeysByTaskId: Record<number, string[]>;
   fastingSelectionByTaskId: Record<number, FastingSelection>;
   defaultFastingSelection: FastingSelection;
   onAmountByTaskIdChange: Dispatch<SetStateAction<Record<number, string>>>;
   onFastingSelectionChange: Dispatch<SetStateAction<Record<number, FastingSelection>>>;
+  onToggleInlineTaskKey: (taskId: number, key: string) => void;
   onLogTask: (task: Task) => Promise<void>;
   submittingTaskId: number | null;
   successMessage: string | null;
@@ -424,6 +502,9 @@ function getCategoryLabel(category: string, t: ReturnType<typeof useI18n>["t"]) 
   }
   if (normalized === "prayers") {
     return t("tasks.categoryPrayers");
+  }
+  if (normalized === "other") {
+    return t("tasks.categoryOther");
   }
   if (normalized === "forbidden") {
     return t("tasks.categoryForbidden");
@@ -479,6 +560,7 @@ function CategoryRail({
 
 function ClassicTasksView({
   colors,
+  isArabic,
   loading,
   error,
   categories,
@@ -489,10 +571,12 @@ function ClassicTasksView({
   streakByTaskId,
   amountByTaskId,
   todayCompletionCountByTaskId,
+  selectedInlineTaskKeysByTaskId,
   fastingSelectionByTaskId,
   defaultFastingSelection,
   onAmountByTaskIdChange,
   onFastingSelectionChange,
+  onToggleInlineTaskKey,
   onLogTask,
   submittingTaskId,
   successMessage,
@@ -538,7 +622,7 @@ function ClassicTasksView({
             <TaskItemCard
               key={task.id}
               task={task}
-              categoryLabel={getCategoryLabel(getTaskCategory(task), t)}
+              categoryLabel={getCategoryLabel(getTaskCategory(task, isArabic ? "ar" : "en"), t)}
               amountValue={amountByTaskId[task.id] || ""}
               onAmountChange={(value) => onAmountByTaskIdChange((prev) => ({ ...prev, [task.id]: value }))}
               onLog={() => void onLogTask(task)}
@@ -557,6 +641,9 @@ function ClassicTasksView({
               onFastingSelectionChange={(value) =>
                 onFastingSelectionChange((prev) => ({ ...prev, [task.id]: value }))
               }
+              inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
+              selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
+              onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
             />
           ))}
         </View>
@@ -567,6 +654,7 @@ function ClassicTasksView({
 
 function RamadanModernTasksView({
   colors,
+  isArabic,
   loading,
   error,
   categories,
@@ -577,10 +665,12 @@ function RamadanModernTasksView({
   streakByTaskId,
   amountByTaskId,
   todayCompletionCountByTaskId,
+  selectedInlineTaskKeysByTaskId,
   fastingSelectionByTaskId,
   defaultFastingSelection,
   onAmountByTaskIdChange,
   onFastingSelectionChange,
+  onToggleInlineTaskKey,
   onLogTask,
   submittingTaskId,
   successMessage,
@@ -639,7 +729,7 @@ function RamadanModernTasksView({
             <RamadanTaskCard
               key={task.id}
               task={task}
-              categoryLabel={getCategoryLabel(getTaskCategory(task), t)}
+              categoryLabel={getCategoryLabel(getTaskCategory(task, isArabic ? "ar" : "en"), t)}
               amountValue={amountByTaskId[task.id] || ""}
               onAmountChange={(value) => onAmountByTaskIdChange((prev) => ({ ...prev, [task.id]: value }))}
               onLog={() => void onLogTask(task)}
@@ -659,6 +749,9 @@ function RamadanModernTasksView({
               onFastingSelectionChange={(value) =>
                 onFastingSelectionChange((prev) => ({ ...prev, [task.id]: value }))
               }
+              inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
+              selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
+              onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
               t={t}
             />
           ))}
@@ -670,6 +763,7 @@ function RamadanModernTasksView({
 
 function ModernTasksView({
   colors,
+  isArabic,
   loading,
   error,
   categories,
@@ -680,10 +774,12 @@ function ModernTasksView({
   streakByTaskId,
   amountByTaskId,
   todayCompletionCountByTaskId,
+  selectedInlineTaskKeysByTaskId,
   fastingSelectionByTaskId,
   defaultFastingSelection,
   onAmountByTaskIdChange,
   onFastingSelectionChange,
+  onToggleInlineTaskKey,
   onLogTask,
   submittingTaskId,
   successMessage,
@@ -728,7 +824,7 @@ function ModernTasksView({
             <ModernTaskCard
               key={task.id}
               task={task}
-              categoryLabel={getCategoryLabel(getTaskCategory(task), t)}
+              categoryLabel={getCategoryLabel(getTaskCategory(task, isArabic ? "ar" : "en"), t)}
               amountValue={amountByTaskId[task.id] || ""}
               onAmountChange={(value) => onAmountByTaskIdChange((prev) => ({ ...prev, [task.id]: value }))}
               onLog={() => void onLogTask(task)}
@@ -748,6 +844,9 @@ function ModernTasksView({
               onFastingSelectionChange={(value) =>
                 onFastingSelectionChange((prev) => ({ ...prev, [task.id]: value }))
               }
+              inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
+              selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
+              onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
               t={t}
             />
           ))}
@@ -769,6 +868,9 @@ function RamadanTaskCard({
   completedToday,
   fastingSelection,
   onFastingSelectionChange,
+  inlineTasks,
+  selectedInlineTaskKeys,
+  onToggleInlineTaskKey,
   t,
 }: {
   task: Task;
@@ -782,6 +884,9 @@ function RamadanTaskCard({
   completedToday: boolean;
   fastingSelection: FastingSelection;
   onFastingSelectionChange: (value: FastingSelection) => void;
+  inlineTasks: Array<{ key: string; label: string }>;
+  selectedInlineTaskKeys: string[];
+  onToggleInlineTaskKey: (key: string) => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -838,6 +943,31 @@ function RamadanTaskCard({
         </Text>
       </Pressable>
 
+      {inlineTasks.length > 0 ? (
+        <View style={styles.inlineTaskGroup}>
+          <Text style={styles.ramadanTimingLabel}>{t("tasks.inlineMinorTasks")}</Text>
+          <View style={styles.inlineTaskChips}>
+            {inlineTasks.map((item) => {
+              const checked = selectedInlineTaskKeys.includes(item.key);
+              return (
+                <Pressable
+                  key={item.key}
+                  onPress={() => onToggleInlineTaskKey(item.key)}
+                  style={[
+                    styles.inlineTaskChip,
+                    checked ? styles.inlineTaskChipActiveRamadan : null,
+                  ]}
+                >
+                  <Text style={[styles.inlineTaskChipText, checked ? styles.inlineTaskChipTextActiveRamadan : null]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
       {showAmount ? (
         <TextInput
           value={amountValue}
@@ -883,6 +1013,9 @@ function ModernTaskCard({
   completedToday,
   fastingSelection,
   onFastingSelectionChange,
+  inlineTasks,
+  selectedInlineTaskKeys,
+  onToggleInlineTaskKey,
   t,
 }: {
   task: Task;
@@ -896,6 +1029,9 @@ function ModernTaskCard({
   completedToday: boolean;
   fastingSelection: FastingSelection;
   onFastingSelectionChange: (value: FastingSelection) => void;
+  inlineTasks: Array<{ key: string; label: string }>;
+  selectedInlineTaskKeys: string[];
+  onToggleInlineTaskKey: (key: string) => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -948,6 +1084,31 @@ function ModernTaskCard({
                 ? t("tasks.conditionalHint")
                 : task.description || t("tasks.noDescription")}
             </Text>
+          </View>
+        ) : null}
+
+        {inlineTasks.length > 0 ? (
+          <View style={styles.inlineTaskGroup}>
+            <Text style={styles.modernTimingLabel}>{t("tasks.inlineMinorTasks")}</Text>
+            <View style={styles.inlineTaskChips}>
+              {inlineTasks.map((item) => {
+                const checked = selectedInlineTaskKeys.includes(item.key);
+                return (
+                  <Pressable
+                    key={item.key}
+                    onPress={() => onToggleInlineTaskKey(item.key)}
+                    style={[
+                      styles.inlineTaskChip,
+                      checked ? styles.inlineTaskChipActiveModern : null,
+                    ]}
+                  >
+                    <Text style={[styles.inlineTaskChipText, checked ? styles.inlineTaskChipTextActiveModern : null]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         ) : null}
 
@@ -1365,6 +1526,41 @@ const styles = StyleSheet.create({
   modernActions: {
     flexDirection: "row",
     gap: 8,
+  },
+  inlineTaskGroup: {
+    gap: 6,
+  },
+  inlineTaskChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  inlineTaskChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderColor: "#d0d8e6",
+    backgroundColor: "transparent",
+  },
+  inlineTaskChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#5b6677",
+  },
+  inlineTaskChipActiveRamadan: {
+    borderColor: "#caa34f",
+    backgroundColor: "rgba(202,163,79,0.2)",
+  },
+  inlineTaskChipTextActiveRamadan: {
+    color: "#4d3a16",
+  },
+  inlineTaskChipActiveModern: {
+    borderColor: "#3f7df3",
+    backgroundColor: "#eaf2ff",
+  },
+  inlineTaskChipTextActiveModern: {
+    color: "#1c4da8",
   },
   bgOrb: {
     position: "absolute",

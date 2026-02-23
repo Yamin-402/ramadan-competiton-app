@@ -43,6 +43,7 @@ const en = {
   "tasks.categoryAll": "All",
   "tasks.categoryStudy": "Study",
   "tasks.categoryPrayers": "Prayers",
+  "tasks.categoryOther": "Other",
   "tasks.categoryForbidden": "Forbidden",
   "tasks.designMode": "Design mode",
   "tasks.designClassic": "Classic",
@@ -89,6 +90,8 @@ const en = {
   "tasks.deps": "Deps",
   "tasks.enterCount": "Enter count",
   "tasks.enterMinutes": "Enter minutes",
+  "tasks.inlineMinorTasks": "Minor tasks",
+  "tasks.inlineSelectRequired": "Select at least one minor task.",
 
   "forbidden.title": "Forbidden Task Log",
   "forbidden.subtitle": "This area is private for you. Use it honestly for self-accountability.",
@@ -235,6 +238,7 @@ const en = {
   "profile.avatarHint": "Paste image URL (square works best)",
   "profile.pickPhoto": "Choose photo",
   "profile.removePhoto": "Remove photo",
+  "profile.changePhotoHint": "Tap the picture to change it",
   "profile.educationLevel": "Education level",
   "profile.educationSchool": "School",
   "profile.educationUniversity": "University",
@@ -271,6 +275,10 @@ const en = {
   "guide.slide6Title": "Main pages",
   "guide.slide6Body":
     "Tasks for completion, Forbidden for private logs, Daily Questions for challenge, and More for leaderboard, history, profile, and settings.",
+  "guide.slide7Title": "Rewards are coming",
+  "guide.slide7Body":
+    "Competition rewards for top winners will be announced later. Keep your consistency high and follow notifications.",
+  "guide.slide7Body2":" a travel to dubai and an image with a beautiful girl",
   "guide.skip": "Skip",
   "guide.back": "Back",
   "guide.next": "Next",
@@ -376,6 +384,7 @@ const ar: Record<keyof typeof en, string> = {
   "tasks.categoryAll": "الكل",
   "tasks.categoryStudy": "المذاكرة",
   "tasks.categoryPrayers": "العبادات",
+  "tasks.categoryOther": "أخرى",
   "tasks.categoryForbidden": "ممنوع",
   "tasks.designMode": "نمط التصميم",
   "tasks.designClassic": "كلاسيك",
@@ -421,6 +430,8 @@ const ar: Record<keyof typeof en, string> = {
   "tasks.deps": "اعتمادات",
   "tasks.enterCount": "أدخل العدد",
   "tasks.enterMinutes": "أدخل الدقائق",
+  "tasks.inlineMinorTasks": "المهام الفرعية",
+  "tasks.inlineSelectRequired": "اختَر مهمة فرعية واحدة على الأقل.",
 
   "forbidden.title": "تسجيل المهام الممنوعة",
   "forbidden.subtitle": "هذه المساحة خاصة بك.",
@@ -567,6 +578,7 @@ const ar: Record<keyof typeof en, string> = {
   "profile.avatarHint": "الصق رابط صورة (المربع أفضل)",
   "profile.pickPhoto": "اختر صورة",
   "profile.removePhoto": "حذف الصورة",
+  "profile.changePhotoHint": "اضغط على الصورة لتغييرها",
   "profile.educationLevel": "المرحلة التعليمية",
   "profile.educationSchool": "مدرسة",
   "profile.educationUniversity": "جامعة",
@@ -603,6 +615,10 @@ const ar: Record<keyof typeof en, string> = {
   "guide.slide6Title": "الأقسام الأساسية",
   "guide.slide6Body":
     "المهام للتنفيذ، الممنوع للمتابعة الخاصة، السؤال اليومي للتحدي، والمزيد للترتيب والسجل والملف والإعدادات.",
+  "guide.slide7Title": "في جوائز جاية",
+  "guide.slide7Body":
+    "جوائز المنافسة للفائزين الأوائل هتتعلن قريب. خليك مستمر وتابع الإشعارات.",
+    "guide.slide7Body2": "الي هيكسب هنجوزو بزوجة صالحة",
   "guide.skip": "تخطي",
   "guide.back": "رجوع",
   "guide.next": "التالي",

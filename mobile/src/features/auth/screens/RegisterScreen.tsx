@@ -168,18 +168,28 @@ export function RegisterScreen({ navigation }: Props) {
             <View style={styles.row}>
               <AppButton
                 label={t("auth.university")}
-                variant={audience === "UNIVERSITY" ? "primary" : "ghost"}
+                variant="ghost"
                 onPress={() => {
                   setAudience("UNIVERSITY");
                   setSchoolSystem(null);
                 }}
-                style={styles.rowButton}
+                style={[
+                  styles.rowButton,
+                  audience === "UNIVERSITY"
+                    ? { borderColor: colors.gold, backgroundColor: `${colors.gold}22` }
+                    : undefined,
+                ]}
               />
               <AppButton
                 label={t("auth.school")}
-                variant={audience === "SCHOOL" ? "primary" : "ghost"}
+                variant="ghost"
                 onPress={() => setAudience("SCHOOL")}
-                style={styles.rowButton}
+                style={[
+                  styles.rowButton,
+                  audience === "SCHOOL"
+                    ? { borderColor: colors.gold, backgroundColor: `${colors.gold}22` }
+                    : undefined,
+                ]}
               />
             </View>
 
@@ -191,22 +201,37 @@ export function RegisterScreen({ navigation }: Props) {
                 <View style={styles.row}>
                   <AppButton
                     label={t("auth.egyptian")}
-                    variant={schoolSystem === "EGYPTIAN" ? "primary" : "ghost"}
+                    variant="ghost"
                     onPress={() => setSchoolSystem("EGYPTIAN")}
-                    style={styles.rowButton}
+                    style={[
+                      styles.rowButton,
+                      schoolSystem === "EGYPTIAN"
+                        ? { borderColor: colors.gold, backgroundColor: `${colors.gold}22` }
+                        : undefined,
+                    ]}
                   />
                   <AppButton
                     label={t("auth.foreign")}
-                    variant={schoolSystem === "FOREIGN" ? "primary" : "ghost"}
+                    variant="ghost"
                     onPress={() => setSchoolSystem("FOREIGN")}
-                    style={styles.rowButton}
+                    style={[
+                      styles.rowButton,
+                      schoolSystem === "FOREIGN"
+                        ? { borderColor: colors.gold, backgroundColor: `${colors.gold}22` }
+                        : undefined,
+                    ]}
                   />
                 </View>
               </>
             ) : null}
 
             <View style={styles.modalActions}>
-              <AppButton label={t("auth.continue")} onPress={() => void onEducationContinue()} style={styles.rowButton} />
+              <AppButton
+                label={t("auth.continue")}
+                onPress={() => void onEducationContinue()}
+                style={[styles.rowButton, { backgroundColor: colors.success, borderColor: colors.success }]}
+                labelColor="#fff"
+              />
               <AppButton
                 label={t("auth.cancel")}
                 variant="ghost"

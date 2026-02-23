@@ -46,6 +46,14 @@ export const adminApi = {
       isPrivate?: boolean;
       startsAt?: string | null;
       endsAt?: string | null;
+      categoryTagId?: number | null;
+      categoryTag?:
+        | {
+            key: string;
+            labelEn: string;
+            labelAr: string;
+          }
+        | null;
       requiredTagKeys?: string[];
     }
   ) {

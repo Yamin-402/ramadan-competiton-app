@@ -1,0 +1,44 @@
+Great question. To avoid the try/fail loop, use this **fixed export flow** every time.
+
+**Use this exact process**
+1. Set API env before export (must be correct):
+```powershell
+cd mobile
+$env:EXPO_PUBLIC_API_BASE_URL="https://ramadan-competiton-app.fly.dev/api/v1"
+```
+
+2. Export directly into `mobile-web/dist` (no manual copy mistakes):
+```powershell
+npx expo export --platform web --output-dir ../mobile-web/dist --clear
+cd ..
+```
+
+3. Run 3 checks before deploy:
+```powershell
+# 1) script must be module
+Select-String -Path mobile-web/dist/index.html -Pattern '<script type="module"'
+
+# 2) no broken host typo
+rg "hhttps://|ramadan-competition-app.fly.dev" mobile-web/dist -n
+
+# 3) correct backend host exists in bundle
+rg "ramadan-competiton-app.fly.dev/api/v1" mobile-web/dist -n
+```
+
+4. If check (1) fails, patch once:
+```powershell
+$raw = Get-Content mobile-web/dist/index.html -Raw
+$raw = $raw -replace '<script src="/_expo/static/js/web/','<script type="module" src="/_expo/static/js/web/'
+Set-Content mobile-web/dist/index.html -Value $raw -NoNewline
+```
+
+5. Deploy, then hard refresh browser (`Ctrl+F5`).
+
+**What to edit in files each time**
+- Normally: **nothing**.
+- Only environment value (if backend changes):
+  - `mobile/.env` (local)
+  - `mobile/eas.json` (APK cloud builds)
+- Do **not** manually edit hashed `AppEntry-*.js` unless an emergency.
+
+If you want, I can add one PowerShell script (`scripts/export-mobile-web.ps1`) that does all steps + checks automatically in one command.
