@@ -2,7 +2,10 @@ import { Router } from "express";
 import { asyncHandler } from "../../core/middleware/async-handler.js";
 import { requireAuth } from "../../core/middleware/require-auth.js";
 import { requireRole } from "../../core/middleware/require-role.js";
+import { loadAuthUser } from "../../core/middleware/load-auth-user.js";
+import { requireAdminPermission } from "../../core/middleware/require-admin-permission.js";
 import {
+  createAdminAccount,
   createCounter,
   createDailyQuestion,
   createManualAdjustment,
@@ -18,6 +21,7 @@ import {
   listDailyQuestionAnswers,
   listDailyQuestions,
   listNotificationCampaigns,
+  listPermissionKeys,
   listTasks,
   listTaskCounterRules,
   listUserActivities,
@@ -27,39 +31,64 @@ import {
   revealDailyQuestionAnswers,
   reviewDailyQuestionAnswer,
   setUserLeaderboardVisibility,
+  updateAdminAccess,
   updateDailyQuestion,
   updateTask,
 } from "./admin.controller.js";
 
 const router = Router();
 
-router.use(requireAuth, requireRole("ADMIN", "SUPER_ADMIN"));
+router.use(requireAuth, loadAuthUser, requireRole("ADMIN", "SUPER_ADMIN"));
 
-router.post("/tasks", asyncHandler(createTask));
-router.get("/tasks", asyncHandler(listTasks));
-router.patch("/tasks/:id", asyncHandler(updateTask));
-router.delete("/tasks/:id", asyncHandler(deleteTask));
-router.post("/counters", asyncHandler(createCounter));
-router.get("/counters", asyncHandler(listCounters));
-router.get("/users", asyncHandler(listUsers));
-router.delete("/users/:id", asyncHandler(removeUser));
-router.patch("/users/:id/leaderboard-visibility", asyncHandler(setUserLeaderboardVisibility));
-router.delete("/users/:id/avatar", asyncHandler(removeUserAvatar));
-router.get("/users/:id/activities", asyncHandler(listUserActivities));
-router.post("/task-counter-rules", asyncHandler(createTaskCounterRule));
-router.get("/task-counter-rules", asyncHandler(listTaskCounterRules));
-router.delete("/task-counter-rules/:id", asyncHandler(deleteTaskCounterRule));
-router.post("/points/adjustments", asyncHandler(createManualAdjustment));
-router.post("/notifications/campaigns", asyncHandler(createNotificationCampaign));
-router.get("/notifications/campaigns", asyncHandler(listNotificationCampaigns));
-router.delete("/notifications/campaigns/:id", asyncHandler(deleteNotificationCampaign));
-router.post("/daily-questions", asyncHandler(createDailyQuestion));
-router.get("/daily-questions", asyncHandler(listDailyQuestions));
-router.post("/daily-questions/reveal", asyncHandler(revealDailyQuestionAnswers));
-router.patch("/daily-questions/:id", asyncHandler(updateDailyQuestion));
-router.delete("/daily-questions/:id", asyncHandler(deleteDailyQuestion));
-router.get("/daily-questions/:id/answers", asyncHandler(listDailyQuestionAnswers));
-router.patch("/daily-questions/answers/:answerId/review", asyncHandler(reviewDailyQuestionAnswer));
-router.get("/leaderboard", asyncHandler(getLeaderboard));
+router.get("/permissions", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(listPermissionKeys));
+router.post("/users/admin-accounts", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(createAdminAccount));
+router.patch("/users/:id/admin-access", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(updateAdminAccess));
+
+router.post("/tasks", requireAdminPermission("TASKS"), asyncHandler(createTask));
+router.get("/tasks", requireAdminPermission("TASKS"), asyncHandler(listTasks));
+router.patch("/tasks/:id", requireAdminPermission("TASKS"), asyncHandler(updateTask));
+router.delete("/tasks/:id", requireAdminPermission("TASKS"), asyncHandler(deleteTask));
+router.post("/counters", requireAdminPermission("COUNTERS"), asyncHandler(createCounter));
+router.get("/counters", requireAdminPermission("COUNTERS"), asyncHandler(listCounters));
+router.get("/users", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(listUsers));
+router.delete("/users/:id", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(removeUser));
+router.patch(
+  "/users/:id/leaderboard-visibility",
+  requireAdminPermission("LEADERBOARD"),
+  asyncHandler(setUserLeaderboardVisibility)
+);
+router.delete("/users/:id/avatar", requireAdminPermission("USER_MANAGEMENT"), asyncHandler(removeUserAvatar));
+router.get("/users/:id/activities", requireAdminPermission("USER_TASK_HISTORY"), asyncHandler(listUserActivities));
+router.post("/task-counter-rules", requireAdminPermission("TASK_COUNTER_RULES"), asyncHandler(createTaskCounterRule));
+router.get("/task-counter-rules", requireAdminPermission("TASK_COUNTER_RULES"), asyncHandler(listTaskCounterRules));
+router.delete(
+  "/task-counter-rules/:id",
+  requireAdminPermission("TASK_COUNTER_RULES"),
+  asyncHandler(deleteTaskCounterRule)
+);
+router.post("/points/adjustments", requireAdminPermission("ADJUSTMENTS"), asyncHandler(createManualAdjustment));
+router.post(
+  "/notifications/campaigns",
+  requireAdminPermission("NOTIFICATIONS"),
+  asyncHandler(createNotificationCampaign)
+);
+router.get("/notifications/campaigns", requireAdminPermission("NOTIFICATIONS"), asyncHandler(listNotificationCampaigns));
+router.delete(
+  "/notifications/campaigns/:id",
+  requireAdminPermission("NOTIFICATIONS"),
+  asyncHandler(deleteNotificationCampaign)
+);
+router.post("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(createDailyQuestion));
+router.get("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(listDailyQuestions));
+router.post("/daily-questions/reveal", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(revealDailyQuestionAnswers));
+router.patch("/daily-questions/:id", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(updateDailyQuestion));
+router.delete("/daily-questions/:id", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(deleteDailyQuestion));
+router.get("/daily-questions/:id/answers", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(listDailyQuestionAnswers));
+router.patch(
+  "/daily-questions/answers/:answerId/review",
+  requireAdminPermission("DAILY_QUESTIONS"),
+  asyncHandler(reviewDailyQuestionAnswer)
+);
+router.get("/leaderboard", requireAdminPermission("LEADERBOARD"), asyncHandler(getLeaderboard));
 
 export default router;

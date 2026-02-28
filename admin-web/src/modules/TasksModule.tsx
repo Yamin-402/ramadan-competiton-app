@@ -21,6 +21,8 @@ type AudienceType =
   | "SCHOOL_FOREIGN";
 type CompletionPolicy = "SINGLE" | "MULTIPLE_LIMITED" | "MULTIPLE_UNLIMITED";
 type StreakBonusMode = "ONE_TIME" | "RECURRING_SAME" | "RECURRING_CUSTOM";
+type ConditionalMode = "EXISTING_TASKS" | "NEW_CHILD_TASKS";
+type PartialRewardMode = "BY_COUNT" | "BY_TASKS";
 
 interface TaskFormState {
   title: string;
@@ -51,7 +53,9 @@ interface TaskFormState {
   conditionEnabled: boolean;
   conditionTargetTaskId: string;
   conditionValue: string;
+  conditionalMode: ConditionalMode;
   conditionalChildTaskIds: string[];
+  conditionalPartialMode: PartialRewardMode;
   conditionalPartialCount: string;
   conditionalPartialPoints: string;
   conditionalPartialRequiredTaskIds: string[];
@@ -61,6 +65,7 @@ interface TaskFormState {
     titleEn: string;
     titleAr: string;
   }>;
+  conditionalInlinePartialMode: PartialRewardMode;
   conditionalInlinePartialCount: string;
   conditionalInlinePartialPoints: string;
   conditionalInlinePartialRequiredKeys: string[];
@@ -96,12 +101,15 @@ const defaultForm: TaskFormState = {
   conditionEnabled: false,
   conditionTargetTaskId: "",
   conditionValue: "1",
+  conditionalMode: "EXISTING_TASKS",
   conditionalChildTaskIds: [],
+  conditionalPartialMode: "BY_COUNT",
   conditionalPartialCount: "",
   conditionalPartialPoints: "",
   conditionalPartialRequiredTaskIds: [],
   conditionalFullPoints: "",
   conditionalInlineTasks: [],
+  conditionalInlinePartialMode: "BY_COUNT",
   conditionalInlinePartialCount: "",
   conditionalInlinePartialPoints: "",
   conditionalInlinePartialRequiredKeys: [],
@@ -269,14 +277,33 @@ function streakBonusModeFromTask(task: AdminTask): StreakBonusMode {
   return "ONE_TIME";
 }
 
+function parseConditionalModeFromTask(task: AdminTask): ConditionalMode {
+  const rawMode = typeof task.config?.conditionalChildSource === "string"
+    ? task.config.conditionalChildSource.toUpperCase()
+    : "";
+  if (rawMode === "EXISTING_TASKS" || rawMode === "NEW_CHILD_TASKS") {
+    return rawMode;
+  }
+
+  const hasExisting = Array.isArray(task.config?.conditionalChildTaskIds)
+    && task.config.conditionalChildTaskIds.length > 0;
+  const hasInline = Array.isArray(task.config?.conditionalInlineTasks)
+    && task.config.conditionalInlineTasks.length > 0;
+
+  if (hasInline && !hasExisting) {
+    return "NEW_CHILD_TASKS";
+  }
+
+  return "EXISTING_TASKS";
+}
+
 export function TasksModule({ tasks, counters, tags, onRefreshReferences }: TasksModuleProps) {
   const [form, setForm] = useState<TaskFormState>(defaultForm);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [newInlineTaskEn, setNewInlineTaskEn] = useState("");
-  const [newInlineTaskAr, setNewInlineTaskAr] = useState("");
+  const [newInlineTaskName, setNewInlineTaskName] = useState("");
 
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => b.id - a.id), [tasks]);
   const categoryTags = useMemo(
@@ -293,6 +320,102 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
   };
 
   const fillFormFromTask = (task: AdminTask) => {
+    const conditionalMode = parseConditionalModeFromTask(task);
+    const parsedChildTaskIds = Array.isArray(task.config?.conditionalChildTaskIds)
+      ? task.config.conditionalChildTaskIds.map((value) => String(value))
+      : [];
+    const parsedRewardTiers = Array.isArray(task.config?.conditionalRewardTiers)
+      ? task.config.conditionalRewardTiers
+          .map((tier) => ({
+            requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+            points: Number((tier as { points?: unknown }).points),
+            requiredTaskIds: Array.isArray((tier as { requiredTaskIds?: unknown }).requiredTaskIds)
+              ? (tier as { requiredTaskIds?: unknown[] }).requiredTaskIds
+                  ?.map((value) => String(value))
+                  .filter(Boolean) || []
+              : [],
+          }))
+          .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
+          .sort((a, b) => a.requiredCount - b.requiredCount)
+      : [];
+    const parsedInlineTasks = Array.isArray(task.config?.conditionalInlineTasks)
+      ? task.config.conditionalInlineTasks
+          .map((item) => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) {
+              return null;
+            }
+            const keyRaw = String((item as { key?: unknown }).key ?? "").trim();
+            const titleEn = String((item as { titleEn?: unknown }).titleEn ?? "").trim();
+            const titleAr = String((item as { titleAr?: unknown }).titleAr ?? "").trim();
+            if (!keyRaw || (!titleEn && !titleAr)) {
+              return null;
+            }
+            const normalizedTitle = titleEn || titleAr;
+            return {
+              key: keyRaw,
+              titleEn: normalizedTitle,
+              titleAr: normalizedTitle,
+            };
+          })
+          .filter(Boolean) as Array<{ key: string; titleEn: string; titleAr: string }>
+      : [];
+    const parsedInlineRewardTiers = Array.isArray(task.config?.conditionalInlineRewardTiers)
+      ? task.config.conditionalInlineRewardTiers
+          .map((tier) => ({
+            requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
+            points: Number((tier as { points?: unknown }).points),
+            requiredInlineTaskKeys: Array.isArray(
+              (tier as { requiredInlineTaskKeys?: unknown }).requiredInlineTaskKeys
+            )
+              ? (tier as { requiredInlineTaskKeys?: unknown[] }).requiredInlineTaskKeys
+                  ?.map((value) => String(value))
+                  .filter(Boolean) || []
+              : [],
+          }))
+          .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
+          .sort((a, b) => a.requiredCount - b.requiredCount)
+      : [];
+
+    const existingFullTier =
+      parsedChildTaskIds.length > 0
+        ? parsedRewardTiers.find((tier) => tier.requiredCount >= parsedChildTaskIds.length)
+          || parsedRewardTiers[parsedRewardTiers.length - 1]
+        : parsedRewardTiers[parsedRewardTiers.length - 1];
+    const existingPartialTier =
+      parsedRewardTiers.find((tier) =>
+        existingFullTier ? tier.requiredCount < existingFullTier.requiredCount : true
+      ) || null;
+
+    const inlineFullTier =
+      parsedInlineTasks.length > 0
+        ? parsedInlineRewardTiers.find((tier) => tier.requiredCount >= parsedInlineTasks.length)
+          || parsedInlineRewardTiers[parsedInlineRewardTiers.length - 1]
+        : parsedInlineRewardTiers[parsedInlineRewardTiers.length - 1];
+    const inlinePartialTier =
+      parsedInlineRewardTiers.find((tier) =>
+        inlineFullTier ? tier.requiredCount < inlineFullTier.requiredCount : true
+      ) || null;
+
+    const configPartialMode = typeof task.config?.conditionalPartialMode === "string"
+      ? task.config.conditionalPartialMode.toUpperCase()
+      : "";
+    const conditionalPartialMode: PartialRewardMode =
+      configPartialMode === "BY_COUNT" || configPartialMode === "BY_TASKS"
+        ? configPartialMode
+        : existingPartialTier?.requiredTaskIds.length
+          ? "BY_TASKS"
+          : "BY_COUNT";
+
+    const configInlinePartialMode = typeof task.config?.conditionalInlinePartialMode === "string"
+      ? task.config.conditionalInlinePartialMode.toUpperCase()
+      : "";
+    const conditionalInlinePartialMode: PartialRewardMode =
+      configInlinePartialMode === "BY_COUNT" || configInlinePartialMode === "BY_TASKS"
+        ? configInlinePartialMode
+        : inlinePartialTier?.requiredInlineTaskKeys.length
+          ? "BY_TASKS"
+          : "BY_COUNT";
+
     setForm({
       ...defaultForm,
       title: task.title,
@@ -316,147 +439,45 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
       active: task.status === "ACTIVE",
       startsAt: task.startsAt ? new Date(task.startsAt).toISOString() : "",
       endsAt: task.endsAt ? new Date(task.endsAt).toISOString() : "",
-      conditionalChildTaskIds: Array.isArray(task.config?.conditionalChildTaskIds)
-        ? task.config.conditionalChildTaskIds.map((value) => String(value))
-        : [],
-      conditionalPartialCount: Array.isArray(task.config?.conditionalRewardTiers)
-        ? String(
-            task.config.conditionalRewardTiers
-              .map((tier) => Number((tier as { requiredCount?: unknown }).requiredCount))
-              .filter((value) => Number.isFinite(value))
-              .sort((a, b) => a - b)[0] || ""
-          )
-        : "",
-      conditionalPartialPoints: Array.isArray(task.config?.conditionalRewardTiers)
-        ? String(
-            task.config.conditionalRewardTiers
-              .map((tier) => ({
-                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
-                points: Number((tier as { points?: unknown }).points),
-                requiredTaskIds: Array.isArray((tier as { requiredTaskIds?: unknown }).requiredTaskIds)
-                  ? (tier as { requiredTaskIds?: unknown[] }).requiredTaskIds
-                      ?.map((value) => String(value))
-                      .filter(Boolean) || []
-                  : [],
-              }))
-              .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
-              .sort((a, b) => a.requiredCount - b.requiredCount)[0]?.points ?? ""
-          )
-        : "",
-      conditionalPartialRequiredTaskIds: Array.isArray(task.config?.conditionalRewardTiers)
-        ? (() => {
-            const firstTier = task.config.conditionalRewardTiers
-              .map((tier) => ({
-                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
-                requiredTaskIds: Array.isArray((tier as { requiredTaskIds?: unknown }).requiredTaskIds)
-                  ? (tier as { requiredTaskIds?: unknown[] }).requiredTaskIds
-                      ?.map((value) => String(value))
-                      .filter(Boolean) || []
-                  : [],
-              }))
-              .filter((tier) => Number.isFinite(tier.requiredCount))
-              .sort((a, b) => a.requiredCount - b.requiredCount)[0];
-            return firstTier?.requiredTaskIds || [];
-          })()
-        : [],
-      conditionalFullPoints: Array.isArray(task.config?.conditionalRewardTiers)
-        ? String(
-            task.config.conditionalRewardTiers
-              .map((tier) => Number((tier as { points?: unknown }).points))
-              .filter((value) => Number.isFinite(value))
-              .sort((a, b) => b - a)[0] ?? ""
-          )
-        : "",
-      conditionalInlineTasks: Array.isArray(task.config?.conditionalInlineTasks)
-        ? task.config.conditionalInlineTasks
-            .map((item) => {
-              if (!item || typeof item !== "object" || Array.isArray(item)) {
-                return null;
-              }
-              const keyRaw = String((item as { key?: unknown }).key ?? "").trim();
-              const titleEn = String((item as { titleEn?: unknown }).titleEn ?? "").trim();
-              const titleAr = String((item as { titleAr?: unknown }).titleAr ?? "").trim();
-              if (!keyRaw || (!titleEn && !titleAr)) {
-                return null;
-              }
-              return {
-                key: keyRaw,
-                titleEn,
-                titleAr,
-              };
-            })
-            .filter(Boolean) as Array<{ key: string; titleEn: string; titleAr: string }>
-        : [],
-      conditionalInlinePartialCount: Array.isArray(task.config?.conditionalInlineRewardTiers)
-        ? String(
-            task.config.conditionalInlineRewardTiers
-              .map((tier) => Number((tier as { requiredCount?: unknown }).requiredCount))
-              .filter((value) => Number.isFinite(value))
-              .sort((a, b) => a - b)[0] || ""
-          )
-        : "",
-      conditionalInlinePartialPoints: Array.isArray(task.config?.conditionalInlineRewardTiers)
-        ? String(
-            task.config.conditionalInlineRewardTiers
-              .map((tier) => ({
-                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
-                points: Number((tier as { points?: unknown }).points),
-                requiredInlineTaskKeys: Array.isArray((tier as { requiredInlineTaskKeys?: unknown }).requiredInlineTaskKeys)
-                  ? (tier as { requiredInlineTaskKeys?: unknown[] }).requiredInlineTaskKeys
-                      ?.map((value) => String(value))
-                      .filter(Boolean) || []
-                  : [],
-              }))
-              .filter((tier) => Number.isFinite(tier.requiredCount) && Number.isFinite(tier.points))
-              .sort((a, b) => a.requiredCount - b.requiredCount)[0]?.points ?? ""
-          )
-        : "",
-      conditionalInlinePartialRequiredKeys: Array.isArray(task.config?.conditionalInlineRewardTiers)
-        ? (() => {
-            const firstTier = task.config.conditionalInlineRewardTiers
-              .map((tier) => ({
-                requiredCount: Number((tier as { requiredCount?: unknown }).requiredCount),
-                requiredInlineTaskKeys: Array.isArray((tier as { requiredInlineTaskKeys?: unknown }).requiredInlineTaskKeys)
-                  ? (tier as { requiredInlineTaskKeys?: unknown[] }).requiredInlineTaskKeys
-                      ?.map((value) => String(value))
-                      .filter(Boolean) || []
-                  : [],
-              }))
-              .filter((tier) => Number.isFinite(tier.requiredCount))
-              .sort((a, b) => a.requiredCount - b.requiredCount)[0];
-            return firstTier?.requiredInlineTaskKeys || [];
-          })()
-        : [],
-      conditionalInlineFullPoints: Array.isArray(task.config?.conditionalInlineRewardTiers)
-        ? String(
-            task.config.conditionalInlineRewardTiers
-              .map((tier) => Number((tier as { points?: unknown }).points))
-              .filter((value) => Number.isFinite(value))
-              .sort((a, b) => b - a)[0] ?? ""
-          )
-        : "",
+      conditionalMode,
+      conditionalChildTaskIds: parsedChildTaskIds,
+      conditionalPartialMode,
+      conditionalPartialCount:
+        conditionalPartialMode === "BY_COUNT" && existingPartialTier
+          ? String(existingPartialTier.requiredCount || "")
+          : "",
+      conditionalPartialPoints: existingPartialTier ? String(existingPartialTier.points) : "",
+      conditionalPartialRequiredTaskIds: existingPartialTier?.requiredTaskIds || [],
+      conditionalFullPoints: existingFullTier ? String(existingFullTier.points) : "",
+      conditionalInlineTasks: parsedInlineTasks,
+      conditionalInlinePartialMode,
+      conditionalInlinePartialCount:
+        conditionalInlinePartialMode === "BY_COUNT" && inlinePartialTier
+          ? String(inlinePartialTier.requiredCount || "")
+          : "",
+      conditionalInlinePartialPoints: inlinePartialTier ? String(inlinePartialTier.points) : "",
+      conditionalInlinePartialRequiredKeys: inlinePartialTier?.requiredInlineTaskKeys || [],
+      conditionalInlineFullPoints: inlineFullTier ? String(inlineFullTier.points) : "",
     });
     setEditingTaskId(task.id);
+    setNewInlineTaskName("");
     setError(null);
     setSuccess(null);
   };
 
   const resetForm = () => {
     setForm(defaultForm);
-    setNewInlineTaskEn("");
-    setNewInlineTaskAr("");
+    setNewInlineTaskName("");
     setEditingTaskId(null);
   };
 
   const addInlineTask = () => {
-    const titleEn = newInlineTaskEn.trim();
-    const titleAr = newInlineTaskAr.trim();
-    if (!titleEn && !titleAr) {
+    const title = newInlineTaskName.trim();
+    if (!title) {
       return;
     }
 
-    const keySeed = titleEn || titleAr;
-    const key = normalizeCategoryTagKey(keySeed);
+    const key = normalizeCategoryTagKey(title);
     if (form.conditionalInlineTasks.some((item) => item.key === key)) {
       setError("Inline task key already exists. Change the task title.");
       return;
@@ -466,12 +487,11 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
       ...form.conditionalInlineTasks,
       {
         key,
-        titleEn,
-        titleAr,
+        titleEn: title,
+        titleAr: title,
       },
     ]);
-    setNewInlineTaskEn("");
-    setNewInlineTaskAr("");
+    setNewInlineTaskName("");
   };
 
   const removeInlineTask = (key: string) => {
@@ -521,15 +541,52 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         }
       }
 
-      if (form.flow === "CONDITIONAL" && form.conditionalChildTaskIds.length > 0) {
-        if (!form.conditionalFullPoints || Number(form.conditionalFullPoints) <= 0) {
-          throw new Error("Conditional full points must be greater than 0.");
-        }
-      }
+      if (form.flow === "CONDITIONAL") {
+        if (form.conditionalMode === "EXISTING_TASKS") {
+          if (form.conditionalChildTaskIds.length === 0) {
+            throw new Error("Select at least one existing child task.");
+          }
 
-      if (form.flow === "CONDITIONAL" && form.conditionalInlineTasks.length > 0) {
-        if (!form.conditionalInlineFullPoints || Number(form.conditionalInlineFullPoints) <= 0) {
-          throw new Error("Inline minor-task full points must be greater than 0.");
+          if (!form.conditionalFullPoints || Number(form.conditionalFullPoints) <= 0) {
+            throw new Error("Conditional full points must be greater than 0.");
+          }
+
+          if (form.conditionalPartialPoints) {
+            if (Number(form.conditionalPartialPoints) <= 0) {
+              throw new Error("Conditional partial points must be greater than 0.");
+            }
+            if (form.conditionalPartialMode === "BY_COUNT") {
+              if (!form.conditionalPartialCount || Number(form.conditionalPartialCount) <= 0) {
+                throw new Error("Set a valid partial count for conditional task.");
+              }
+            } else if (form.conditionalPartialRequiredTaskIds.length === 0) {
+              throw new Error("Select at least one child task for partial-by-task mode.");
+            }
+          }
+        } else {
+          if (form.conditionalInlineTasks.length === 0) {
+            throw new Error("Add at least one child task.");
+          }
+
+          if (!form.conditionalInlineFullPoints || Number(form.conditionalInlineFullPoints) <= 0) {
+            throw new Error("Conditional full points must be greater than 0.");
+          }
+
+          if (form.conditionalInlinePartialPoints) {
+            if (Number(form.conditionalInlinePartialPoints) <= 0) {
+              throw new Error("Conditional partial points must be greater than 0.");
+            }
+            if (form.conditionalInlinePartialMode === "BY_COUNT") {
+              if (
+                !form.conditionalInlinePartialCount
+                || Number(form.conditionalInlinePartialCount) <= 0
+              ) {
+                throw new Error("Set a valid partial count for child tasks.");
+              }
+            } else if (form.conditionalInlinePartialRequiredKeys.length === 0) {
+              throw new Error("Select at least one child task for partial-by-task mode.");
+            }
+          }
         }
       }
 
@@ -551,6 +608,71 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         throw new Error("New category tag needs both English and Arabic labels.");
       }
 
+      const conditionalExistingFullCount = form.conditionalChildTaskIds.length;
+      const conditionalExistingPartialCount =
+        form.conditionalPartialMode === "BY_TASKS"
+          ? form.conditionalPartialRequiredTaskIds.length
+          : Number(form.conditionalPartialCount || "0");
+      const conditionalInlineFullCount = form.conditionalInlineTasks.length;
+      const conditionalInlinePartialCount =
+        form.conditionalInlinePartialMode === "BY_TASKS"
+          ? form.conditionalInlinePartialRequiredKeys.length
+          : Number(form.conditionalInlinePartialCount || "0");
+
+      const conditionalRewardTiers =
+        form.flow === "CONDITIONAL" && form.conditionalMode === "EXISTING_TASKS"
+          ? [
+              ...(form.conditionalPartialPoints && conditionalExistingPartialCount > 0
+                ? [
+                    {
+                      requiredCount: conditionalExistingPartialCount,
+                      points: Number(form.conditionalPartialPoints),
+                      requiredTaskIds:
+                        form.conditionalPartialMode === "BY_TASKS"
+                          ? form.conditionalPartialRequiredTaskIds
+                              .map((value) => Number(value))
+                              .filter((value) => Number.isInteger(value) && value > 0)
+                          : [],
+                    },
+                  ]
+                : []),
+              ...(conditionalExistingFullCount > 0 && form.conditionalFullPoints
+                ? [
+                    {
+                      requiredCount: conditionalExistingFullCount,
+                      points: Number(form.conditionalFullPoints),
+                    },
+                  ]
+                : []),
+            ]
+          : [];
+
+      const conditionalInlineRewardTiers =
+        form.flow === "CONDITIONAL" && form.conditionalMode === "NEW_CHILD_TASKS"
+          ? [
+              ...(form.conditionalInlinePartialPoints && conditionalInlinePartialCount > 0
+                ? [
+                    {
+                      requiredCount: conditionalInlinePartialCount,
+                      points: Number(form.conditionalInlinePartialPoints),
+                      requiredInlineTaskKeys:
+                        form.conditionalInlinePartialMode === "BY_TASKS"
+                          ? form.conditionalInlinePartialRequiredKeys
+                          : [],
+                    },
+                  ]
+                : []),
+              ...(conditionalInlineFullCount > 0 && form.conditionalInlineFullPoints
+                ? [
+                    {
+                      requiredCount: conditionalInlineFullCount,
+                      points: Number(form.conditionalInlineFullPoints),
+                    },
+                  ]
+                : []),
+            ]
+          : [];
+
       const config = {
         taskVisibility: form.visibility,
         taskFlowType: form.flow,
@@ -569,66 +691,31 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           form.completionPolicy === "MULTIPLE_LIMITED"
             ? Number(form.completionLimit)
             : null,
+        conditionalChildSource: form.flow === "CONDITIONAL" ? form.conditionalMode : null,
+        conditionalPartialMode:
+          form.flow === "CONDITIONAL" && form.conditionalMode === "EXISTING_TASKS"
+            ? form.conditionalPartialMode
+            : null,
+        conditionalInlinePartialMode:
+          form.flow === "CONDITIONAL" && form.conditionalMode === "NEW_CHILD_TASKS"
+            ? form.conditionalInlinePartialMode
+            : null,
         conditionalChildTaskIds:
-          form.flow === "CONDITIONAL"
+          form.flow === "CONDITIONAL" && form.conditionalMode === "EXISTING_TASKS"
             ? form.conditionalChildTaskIds
                 .map((value) => Number(value))
                 .filter((value) => Number.isInteger(value) && value > 0)
             : [],
-        conditionalRewardTiers:
-          form.flow === "CONDITIONAL"
-            ? [
-                ...(form.conditionalPartialCount && form.conditionalPartialPoints
-                  ? [
-                      {
-                        requiredCount: Number(form.conditionalPartialCount),
-                        points: Number(form.conditionalPartialPoints),
-                        requiredTaskIds: form.conditionalPartialRequiredTaskIds
-                          .map((value) => Number(value))
-                          .filter((value) => Number.isInteger(value) && value > 0),
-                      },
-                    ]
-                  : []),
-                ...(form.conditionalChildTaskIds.length > 0 && form.conditionalFullPoints
-                  ? [
-                      {
-                        requiredCount: form.conditionalChildTaskIds.length,
-                        points: Number(form.conditionalFullPoints),
-                      },
-                    ]
-                  : []),
-              ]
-            : [],
+        conditionalRewardTiers,
         conditionalInlineTasks:
-          form.flow === "CONDITIONAL"
+          form.flow === "CONDITIONAL" && form.conditionalMode === "NEW_CHILD_TASKS"
             ? form.conditionalInlineTasks.map((item) => ({
                 key: item.key,
                 titleEn: item.titleEn,
                 titleAr: item.titleAr,
               }))
             : [],
-        conditionalInlineRewardTiers:
-          form.flow === "CONDITIONAL"
-            ? [
-                ...(form.conditionalInlinePartialCount && form.conditionalInlinePartialPoints
-                  ? [
-                      {
-                        requiredCount: Number(form.conditionalInlinePartialCount),
-                        points: Number(form.conditionalInlinePartialPoints),
-                        requiredInlineTaskKeys: form.conditionalInlinePartialRequiredKeys,
-                      },
-                    ]
-                  : []),
-                ...(form.conditionalInlineTasks.length > 0 && form.conditionalInlineFullPoints
-                  ? [
-                      {
-                        requiredCount: form.conditionalInlineTasks.length,
-                        points: Number(form.conditionalInlineFullPoints),
-                      },
-                    ]
-                  : []),
-              ]
-            : [],
+        conditionalInlineRewardTiers,
       };
 
       const payload = {
@@ -732,7 +819,8 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
   return (
     <div className="stack">
       <PanelCard title={editingTask ? `Edit Task: ${editingTask.title}` : "Create Task"}>
-        <form className="form-grid" onSubmit={submit}>
+        <form className="form-grid tasks-form-grid" onSubmit={submit}>
+          <p className="form-grid__full tasks-section-title">Basic Task Data</p>
           <label>
             Title
             <input value={form.title} onChange={(e) => setField("title", e.target.value)} required />
@@ -752,7 +840,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           </label>
 
           <label>
-            Task Flow Type
+            Task Type
             <select
               value={form.flow}
               onChange={(e) => {
@@ -770,6 +858,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
             </select>
           </label>
 
+          <p className="form-grid__full tasks-section-title">Audience & Category</p>
           <label>
             Audience
             <select value={form.audience} onChange={(e) => setField("audience", e.target.value as AudienceType)}>
@@ -840,6 +929,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
             />
           </label>
 
+          <p className="form-grid__full tasks-section-title">Task Rules</p>
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -936,13 +1026,14 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
             Add Counter Rule (optional for any type)
           </label>
 
+          <p className="form-grid__full tasks-section-title">Task Active Window</p>
           <label>
-            Start At (ISO, optional)
+            Active From (optional ISO datetime)
             <input value={form.startsAt} onChange={(e) => setField("startsAt", e.target.value)} />
           </label>
 
           <label>
-            End At (ISO, optional)
+            Active Until (optional ISO datetime)
             <input value={form.endsAt} onChange={(e) => setField("endsAt", e.target.value)} />
           </label>
 
@@ -958,6 +1049,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
             </label>
           ) : null}
 
+          <p className="form-grid__full tasks-section-title">Counter Link (Optional)</p>
           {form.enableCounterRule ? (
             <>
               <label>
@@ -998,152 +1090,167 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
 
           {form.flow === "CONDITIONAL" ? (
             <>
+              <p className="form-grid__full tasks-section-title">Conditional Setup</p>
               <label className="form-grid__full">
-                Child tasks included in this conditional reward
-                <div className="chip-row">
-                  {tasks
-                    .filter((task) => task.id !== editingTaskId && task.type !== "FORBIDDEN")
-                    .map((task) => {
-                      const checked = form.conditionalChildTaskIds.includes(String(task.id));
-                      return (
-                        <button
-                          key={task.id}
-                          type="button"
-                          className={`chip ${checked ? "chip--active" : ""}`}
-                          onClick={() =>
-                            setField(
-                              "conditionalChildTaskIds",
-                              checked
-                                ? form.conditionalChildTaskIds.filter((id) => id !== String(task.id))
-                                : [...form.conditionalChildTaskIds, String(task.id)]
-                            )
-                          }
-                        >
-                          {task.title}
-                        </button>
-                      );
-                    })}
+                Conditional setup mode
+                <div className="chip-row tasks-chip-row">
+                  <button
+                    type="button"
+                    className={`chip ${form.conditionalMode === "EXISTING_TASKS" ? "chip--active" : ""}`}
+                    onClick={() => setField("conditionalMode", "EXISTING_TASKS")}
+                  >
+                    Use existing tasks
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${form.conditionalMode === "NEW_CHILD_TASKS" ? "chip--active" : ""}`}
+                    onClick={() => setField("conditionalMode", "NEW_CHILD_TASKS")}
+                  >
+                    Create child tasks
+                  </button>
                 </div>
               </label>
 
-              <label>
-                Partial reward count (optional)
-                <input
-                  value={form.conditionalPartialCount}
-                  onChange={(e) => setField("conditionalPartialCount", e.target.value)}
-                  type="number"
-                  min={1}
-                />
-              </label>
-
-              <label>
-                Partial reward points (optional)
-                <input
-                  value={form.conditionalPartialPoints}
-                  onChange={(e) => setField("conditionalPartialPoints", e.target.value)}
-                  type="number"
-                  step="0.01"
-                  min={0}
-                />
-              </label>
-
-              <label className="form-grid__full">
-                Partial reward requires specific child tasks (optional)
-                <div className="chip-row">
-                  {form.conditionalChildTaskIds.map((taskId) => {
-                    const childTask = tasks.find((task) => String(task.id) === taskId);
-                    if (!childTask) {
-                      return null;
-                    }
-                    const checked = form.conditionalPartialRequiredTaskIds.includes(taskId);
-                    return (
-                      <button
-                        key={`partial-${taskId}`}
-                        type="button"
-                        className={`chip ${checked ? "chip--active" : ""}`}
-                        onClick={() =>
-                          setField(
-                            "conditionalPartialRequiredTaskIds",
-                            checked
-                              ? form.conditionalPartialRequiredTaskIds.filter((id) => id !== taskId)
-                              : [...form.conditionalPartialRequiredTaskIds, taskId]
-                          )
-                        }
-                      >
-                        {childTask.title}
-                      </button>
-                    );
-                  })}
-                </div>
-              </label>
-
-              <label>
-                Full reward points (all child tasks)
-                <input
-                  value={form.conditionalFullPoints}
-                  onChange={(e) => setField("conditionalFullPoints", e.target.value)}
-                  type="number"
-                  step="0.01"
-                  min={0}
-                />
-              </label>
-
-              <label className="form-grid__full">
-                Inline minor tasks (shown under this parent task only)
-                <div className="inline-grid">
-                  <div className="form-grid">
-                    <label>
-                      Minor task (EN)
-                      <input
-                        value={newInlineTaskEn}
-                        onChange={(e) => setNewInlineTaskEn(e.target.value)}
-                        placeholder="e.g. Read one hizb"
-                      />
-                    </label>
-                    <label>
-                      Minor task (AR)
-                      <input
-                        value={newInlineTaskAr}
-                        onChange={(e) => setNewInlineTaskAr(e.target.value)}
-                        placeholder="مثال: قراءة جزء"
-                      />
-                    </label>
-                  </div>
-                  <div className="inline-form">
-                    <button type="button" onClick={addInlineTask}>
-                      Add minor task
-                    </button>
-                  </div>
-                  <div className="chip-row">
-                    {form.conditionalInlineTasks.map((item) => (
-                      <button
-                        key={`inline-${item.key}`}
-                        type="button"
-                        className="chip chip--active"
-                        onClick={() => removeInlineTask(item.key)}
-                        title="Click to remove"
-                      >
-                        {(item.titleEn || item.titleAr || item.key)} {item.titleAr && item.titleEn ? `| ${item.titleAr}` : ""}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </label>
-
-              {form.conditionalInlineTasks.length > 0 ? (
+              {form.conditionalMode === "EXISTING_TASKS" ? (
                 <>
+                  <label className="form-grid__full">
+                    Child tasks included in this conditional reward
+                    <div className="chip-row tasks-chip-row">
+                      {tasks
+                        .filter((task) => task.id !== editingTaskId && task.type !== "FORBIDDEN")
+                        .map((task) => {
+                          const checked = form.conditionalChildTaskIds.includes(String(task.id));
+                          return (
+                            <button
+                              key={task.id}
+                              type="button"
+                              className={`chip ${checked ? "chip--active" : ""}`}
+                              onClick={() =>
+                                setField(
+                                  "conditionalChildTaskIds",
+                                  checked
+                                    ? form.conditionalChildTaskIds.filter((id) => id !== String(task.id))
+                                    : [...form.conditionalChildTaskIds, String(task.id)]
+                                )
+                              }
+                            >
+                              {task.title}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </label>
+
                   <label>
-                    Inline partial reward count (optional)
+                    Partial reward points (optional)
                     <input
-                      value={form.conditionalInlinePartialCount}
-                      onChange={(e) => setField("conditionalInlinePartialCount", e.target.value)}
+                      value={form.conditionalPartialPoints}
+                      onChange={(e) => setField("conditionalPartialPoints", e.target.value)}
                       type="number"
-                      min={1}
+                      step="0.01"
+                      min={0}
                     />
                   </label>
 
                   <label>
-                    Inline partial reward points (optional)
+                    Partial reward method
+                    <select
+                      value={form.conditionalPartialMode}
+                      onChange={(e) => setField("conditionalPartialMode", e.target.value as PartialRewardMode)}
+                    >
+                      <option value="BY_COUNT">By completed number</option>
+                      <option value="BY_TASKS">By specific task names</option>
+                    </select>
+                  </label>
+
+                  {form.conditionalPartialMode === "BY_COUNT" ? (
+                    <label>
+                      Partial reward count
+                      <input
+                        value={form.conditionalPartialCount}
+                        onChange={(e) => setField("conditionalPartialCount", e.target.value)}
+                        type="number"
+                        min={1}
+                      />
+                    </label>
+                  ) : (
+                    <label className="form-grid__full">
+                      Partial reward task names
+                      <div className="chip-row tasks-chip-row">
+                        {form.conditionalChildTaskIds.map((taskId) => {
+                          const childTask = tasks.find((task) => String(task.id) === taskId);
+                          if (!childTask) {
+                            return null;
+                          }
+                          const checked = form.conditionalPartialRequiredTaskIds.includes(taskId);
+                          return (
+                            <button
+                              key={`partial-${taskId}`}
+                              type="button"
+                              className={`chip ${checked ? "chip--active" : ""}`}
+                              onClick={() =>
+                                setField(
+                                  "conditionalPartialRequiredTaskIds",
+                                  checked
+                                    ? form.conditionalPartialRequiredTaskIds.filter((id) => id !== taskId)
+                                    : [...form.conditionalPartialRequiredTaskIds, taskId]
+                                )
+                              }
+                            >
+                              {childTask.title}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </label>
+                  )}
+
+                  <label>
+                    Full reward points (all child tasks)
+                    <input
+                      value={form.conditionalFullPoints}
+                      onChange={(e) => setField("conditionalFullPoints", e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min={0}
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="form-grid__full">
+                    Add child task name (same for Arabic + English)
+                    <div className="inline-form">
+                      <input
+                        value={newInlineTaskName}
+                        onChange={(e) => setNewInlineTaskName(e.target.value)}
+                        placeholder="e.g. Read one hizb"
+                      />
+                      <button type="button" onClick={addInlineTask}>
+                        Add child task
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className="form-grid__full">
+                    Child tasks under this conditional task
+                    <div className="chip-row tasks-chip-row">
+                      {form.conditionalInlineTasks.map((item) => (
+                        <button
+                          key={`inline-${item.key}`}
+                          type="button"
+                          className="chip chip--active"
+                          onClick={() => removeInlineTask(item.key)}
+                          title="Click to remove"
+                        >
+                          {item.titleEn || item.key}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+
+                  <label>
+                    Partial reward points (optional)
                     <input
                       value={form.conditionalInlinePartialPoints}
                       onChange={(e) => setField("conditionalInlinePartialPoints", e.target.value)}
@@ -1153,34 +1260,57 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                     />
                   </label>
 
-                  <label className="form-grid__full">
-                    Inline partial reward requires specific minor tasks (optional)
-                    <div className="chip-row">
-                      {form.conditionalInlineTasks.map((item) => {
-                        const checked = form.conditionalInlinePartialRequiredKeys.includes(item.key);
-                        return (
-                          <button
-                            key={`inline-required-${item.key}`}
-                            type="button"
-                            className={`chip ${checked ? "chip--active" : ""}`}
-                            onClick={() =>
-                              setField(
-                                "conditionalInlinePartialRequiredKeys",
-                                checked
-                                  ? form.conditionalInlinePartialRequiredKeys.filter((key) => key !== item.key)
-                                  : [...form.conditionalInlinePartialRequiredKeys, item.key]
-                              )
-                            }
-                          >
-                            {item.titleEn || item.titleAr || item.key}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <label>
+                    Partial reward method
+                    <select
+                      value={form.conditionalInlinePartialMode}
+                      onChange={(e) => setField("conditionalInlinePartialMode", e.target.value as PartialRewardMode)}
+                    >
+                      <option value="BY_COUNT">By completed number</option>
+                      <option value="BY_TASKS">By specific task names</option>
+                    </select>
                   </label>
 
+                  {form.conditionalInlinePartialMode === "BY_COUNT" ? (
+                    <label>
+                      Partial reward count
+                      <input
+                        value={form.conditionalInlinePartialCount}
+                        onChange={(e) => setField("conditionalInlinePartialCount", e.target.value)}
+                        type="number"
+                        min={1}
+                      />
+                    </label>
+                  ) : (
+                    <label className="form-grid__full">
+                      Partial reward task names
+                      <div className="chip-row tasks-chip-row">
+                        {form.conditionalInlineTasks.map((item) => {
+                          const checked = form.conditionalInlinePartialRequiredKeys.includes(item.key);
+                          return (
+                            <button
+                              key={`inline-required-${item.key}`}
+                              type="button"
+                              className={`chip ${checked ? "chip--active" : ""}`}
+                              onClick={() =>
+                                setField(
+                                  "conditionalInlinePartialRequiredKeys",
+                                  checked
+                                    ? form.conditionalInlinePartialRequiredKeys.filter((key) => key !== item.key)
+                                    : [...form.conditionalInlinePartialRequiredKeys, item.key]
+                                )
+                              }
+                            >
+                              {item.titleEn || item.key}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </label>
+                  )}
+
                   <label>
-                    Inline full reward points (all minor tasks)
+                    Full reward points (all child tasks)
                     <input
                       value={form.conditionalInlineFullPoints}
                       onChange={(e) => setField("conditionalInlineFullPoints", e.target.value)}
@@ -1190,15 +1320,15 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                     />
                   </label>
                 </>
-              ) : null}
+              )}
 
-              <label className="checkbox-label">
+              <label className="checkbox-label form-grid__full">
                 <input
                   type="checkbox"
                   checked={form.conditionEnabled}
                   onChange={(e) => setField("conditionEnabled", e.target.checked)}
                 />
-                Enable Simple Condition
+                Enable additional simple condition
               </label>
 
               {form.conditionEnabled ? (

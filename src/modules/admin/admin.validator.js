@@ -7,6 +7,9 @@ const conditionTypeSchema = z.enum(["TASK_COMPLETIONS", "COUNTER_TOTAL", "STREAK
 const conditionOperatorSchema = z.enum(["EQ", "NEQ", "GT", "GTE", "LT", "LTE"]);
 const notificationTargetTypeSchema = z.enum(["ALL_USERS", "TAGS", "USER_IDS"]);
 const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"]);
+const adminRoleSchema = z.enum(["ADMIN", "SUPER_ADMIN"]);
+
+const adminPermissionsSchema = z.array(z.string().min(1)).max(50);
 const categoryTagSchema = z.object({
   key: z.string().min(1),
   labelEn: z.string().min(1),
@@ -204,4 +207,17 @@ export const reviewDailyQuestionAnswerSchema = z.object({
 
 export const adminLeaderboardQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(5000).default(200),
+});
+
+export const createAdminAccountSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  displayName: z.string().trim().min(1).max(120).optional(),
+  role: adminRoleSchema.default("ADMIN"),
+  adminPermissions: adminPermissionsSchema.optional(),
+});
+
+export const updateAdminAccessSchema = z.object({
+  role: adminRoleSchema.optional(),
+  adminPermissions: adminPermissionsSchema.optional(),
 });

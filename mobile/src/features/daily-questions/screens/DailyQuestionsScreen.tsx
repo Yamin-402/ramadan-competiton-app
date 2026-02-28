@@ -33,7 +33,10 @@ function isTodayAnswered(
   }
 
   const found = history.find((item) => item.question.id === todayQuestion.id);
-  return found || null;
+  if (!found || !found.didAnswer) {
+    return null;
+  }
+  return found;
 }
 
 function getHistoryStatusLabel(item: DailyQuestionHistoryItem, t: ReturnType<typeof useI18n>["t"]) {
@@ -117,19 +120,23 @@ export function DailyQuestionsScreen() {
     }, [loadData])
   );
 
+  const todayHistoryEntry = useMemo(
+    () => (todayQuestion ? history.find((item) => item.question.id === todayQuestion.id) || null : null),
+    [todayQuestion, history]
+  );
   const todayAnswer = useMemo(() => isTodayAnswered(todayQuestion, history), [todayQuestion, history]);
   const todayState = useMemo(() => {
     if (!todayQuestion) {
       return "pending";
     }
-    if (!todayAnswer) {
+    if (!todayHistoryEntry || !todayHistoryEntry.didAnswer) {
       return "pending";
     }
-    if (todayAnswer.status === "pending") {
+    if (todayHistoryEntry.status === "pending") {
       return "answered";
     }
     return "revealed";
-  }, [todayAnswer, todayQuestion]);
+  }, [todayHistoryEntry, todayQuestion]);
   const todayStateLabel = useMemo(() => {
     if (todayState === "answered") {
       return t("daily.pendingUntilFajr");
@@ -541,15 +548,27 @@ export function DailyQuestionsScreen() {
                             {getHistoryStatusLabel(item, t)}
                           </Text>
 
-                          <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
-                            {t("daily.yourAnswer")}: {formatAnswerForDisplay(item.answer, t)}
-                          </Text>
-                          <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
-                            {t("daily.correctAnswer")}:{" "}
-                            {item.status === "revealed"
-                              ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
-                              : t("daily.revealLater")}
-                          </Text>
+                          <View style={[styles.answerBlock, { borderColor: colors.border }]}>
+                            <Text style={[styles.answerLabel, { color: colors.textPrimary, textAlign }]}>
+                              {t("daily.yourAnswer")}
+                            </Text>
+                            <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
+                              {item.didAnswer
+                                ? formatAnswerForDisplay(item.answer, t)
+                                : t("daily.notAnswered")}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.answerBlock, { borderColor: colors.border }]}>
+                            <Text style={[styles.answerLabel, { color: colors.textPrimary, textAlign }]}>
+                              {t("daily.correctAnswer")}
+                            </Text>
+                            <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
+                              {item.status === "revealed"
+                                ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
+                                : t("daily.revealLater")}
+                            </Text>
+                          </View>
 
                           <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
                             {t("daily.awarded")}: {formatPoints(item.awardedPoints)} {t("daily.points")}
@@ -639,6 +658,17 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     padding: 10,
     gap: 5,
+  },
+  answerBlock: {
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    gap: 3,
+  },
+  answerLabel: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   metaText: {
     fontSize: 12,

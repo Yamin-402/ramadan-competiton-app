@@ -275,6 +275,59 @@ th {
   font-weight: 700;
 }
 
+.tasks-form-grid {
+  background: #f8f5ee;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  align-items: start;
+}
+
+.tasks-form-grid > label {
+  background: #fff;
+  border: 1px solid #e6dfcf;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.tasks-form-grid > .form-grid__full {
+  background: #fff;
+  border: 1px solid #e6dfcf;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.tasks-form-grid .checkbox-label {
+  min-height: 46px;
+}
+
+.tasks-form-grid .inline-form {
+  align-items: center;
+}
+
+.tasks-form-grid .chip {
+  background: #faf8f1;
+}
+
+.tasks-section-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #2f4235;
+  background: linear-gradient(90deg, #efe6d2 0%, #f9f6ed 100%);
+  border: 1px solid #dfd3ba;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.tasks-chip-row {
+  border: 1px dashed #d6cdb9;
+  border-radius: 10px;
+  padding: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
 .login-layout {
   min-height: 100vh;
   display: grid;

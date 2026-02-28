@@ -561,7 +561,7 @@ export function DailyQuestionsModule() {
                     <td>{row.isRevealed ? "Yes" : "No"}</td>
                     <td>{new Date(row.createdAt).toLocaleString()}</td>
                     <td>
-                      {selectedQuestion.answerType === "TEXT" && !row.isRevealed ? (
+                      {selectedQuestion.answerType === "TEXT" ? (
                         <div className="inline-form">
                           <input
                             type="number"

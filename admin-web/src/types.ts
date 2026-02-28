@@ -12,6 +12,7 @@ export interface AdminSessionUser {
   email: string;
   displayName: string | null;
   role: UserRole;
+  adminPermissions?: string[] | null;
 }
 
 export interface AdminSession {
@@ -71,7 +72,17 @@ export interface AdminUser {
   displayName: string | null;
   avatarUrl?: string | null;
   role: UserRole;
+  adminPermissions?: string[] | null;
   isLeaderboardVisible?: boolean;
+}
+
+export interface AdminAccessUser {
+  id: number;
+  email: string;
+  displayName: string | null;
+  role: UserRole;
+  adminPermissions: string[] | null;
+  isActive: boolean;
 }
 
 export interface AdminTaskCounterRule {
@@ -174,6 +185,7 @@ export interface AdminUserActivity {
     key: string;
     title: string;
     type: TaskType;
+    basePoints?: string | number;
     config?: Record<string, unknown> | null;
   } | null;
   counterDeltas: Array<{

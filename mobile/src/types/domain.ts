@@ -96,11 +96,13 @@ export interface Activity {
   isDuringFasting: boolean;
   isForbidden: boolean;
   note?: string | null;
+  metadata?: Record<string, unknown> | null;
   task?: {
     id: number;
     key: string;
     title: string;
     type: TaskType;
+    basePoints?: number | string;
     config?: Record<string, unknown> | null;
   } | null;
   counterDeltas: CounterDelta[];
@@ -120,8 +122,9 @@ export interface DailyQuestion {
 export interface DailyQuestionHistoryItem {
   id: number;
   question: DailyQuestion;
-  answer: unknown;
+  answer: unknown | null;
   questionCorrectAnswer?: unknown;
+  didAnswer?: boolean;
   status: "pending" | "revealed";
   isCorrect: boolean | null;
   awardedPoints: number | string;

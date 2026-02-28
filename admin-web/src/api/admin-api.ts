@@ -1,4 +1,5 @@
 import {
+  AdminAccessUser,
   AdminCounter,
   AdminDailyQuestionAnswer,
   AdminTask,
@@ -291,6 +292,41 @@ export const adminApi = {
       method: "GET",
       url: "/admin/leaderboard",
       params: { limit },
+    });
+  },
+
+  listAdminPermissions() {
+    return requestData<string[]>({
+      method: "GET",
+      url: "/admin/permissions",
+    });
+  },
+
+  createAdminAccount(payload: {
+    email: string;
+    password: string;
+    displayName?: string;
+    role: "ADMIN" | "SUPER_ADMIN";
+    adminPermissions?: string[];
+  }) {
+    return requestData<AdminAccessUser>({
+      method: "POST",
+      url: "/admin/users/admin-accounts",
+      data: payload,
+    });
+  },
+
+  updateAdminAccess(
+    userId: number,
+    payload: {
+      role?: "ADMIN" | "SUPER_ADMIN";
+      adminPermissions?: string[];
+    }
+  ) {
+    return requestData<AdminAccessUser>({
+      method: "PATCH",
+      url: `/admin/users/${userId}/admin-access`,
+      data: payload,
     });
   },
 };

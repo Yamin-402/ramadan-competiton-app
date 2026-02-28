@@ -3,6 +3,8 @@ import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
 import { getOrCreateFastingWindow } from "../../integrations/prayer-times/prayer-time.service.js";
+import { normalizeAdminPermissions } from "../../core/auth/admin-permissions.js";
+import bcrypt from "bcrypt";
 import { adminRepository } from "./admin.repository.js";
 
 function normalizeUniqueKeys(values) {
@@ -528,6 +530,83 @@ export const adminService = {
     return adminRepository.listUsers(query);
   },
 
+  async createAdminAccount(auth, payload) {
+    if (auth.role !== "SUPER_ADMIN") {
+      throw new AppError(403, "Only super admin can create admin accounts");
+    }
+
+    const existing = await adminRepository.findUserByEmail(payload.email);
+    if (existing) {
+      throw new AppError(409, "Email already registered");
+    }
+
+    const adminPermissions = normalizeAdminPermissions(payload.adminPermissions);
+    const hashedPassword = await bcrypt.hash(payload.password, 10);
+    const created = await adminRepository.createAdminAccount({
+      email: payload.email,
+      displayName: payload.displayName,
+      passwordHash: hashedPassword,
+      role: payload.role,
+      adminPermissions,
+    });
+
+    await adminRepository.createAdminActionLog({
+      adminId: getAuthUserId(auth),
+      action: "CREATE_ADMIN_ACCOUNT",
+      entityType: "USER",
+      entityId: String(created.id),
+      summary: `Created admin account ${created.email}`,
+      payload: {
+        email: created.email,
+        role: created.role,
+        adminPermissions,
+      },
+    });
+
+    return created;
+  },
+
+  async updateAdminAccess(auth, userId, payload) {
+    if (auth.role !== "SUPER_ADMIN") {
+      throw new AppError(403, "Only super admin can update admin access");
+    }
+
+    const actorId = getAuthUserId(auth);
+    if (actorId === userId && payload.role && payload.role !== "SUPER_ADMIN") {
+      throw new AppError(400, "Super admin cannot demote their own account");
+    }
+
+    const target = await adminRepository.findUserById(userId);
+    if (!target) {
+      throw new AppError(404, "User not found");
+    }
+
+    const role = payload.role ?? target.role;
+    const adminPermissions =
+      Object.prototype.hasOwnProperty.call(payload, "adminPermissions")
+        ? normalizeAdminPermissions(payload.adminPermissions)
+        : target.adminPermissions;
+
+    const updated = await adminRepository.updateAdminAccess(userId, {
+      role,
+      adminPermissions: role === "ADMIN" ? adminPermissions : null,
+    });
+
+    await adminRepository.createAdminActionLog({
+      adminId: actorId,
+      action: "UPDATE_ADMIN_ACCESS",
+      entityType: "USER",
+      entityId: String(userId),
+      summary: `Updated admin access for ${updated.email}`,
+      payload: {
+        role,
+        adminPermissions: role === "ADMIN" ? adminPermissions : null,
+      },
+    });
+
+    return updated;
+  },
+
   async removeUser(auth, userId) {
     const adminId = getAuthUserId(auth);
     if (adminId === userId) {
@@ -873,10 +952,6 @@ export const adminService = {
       throw new AppError(400, "Manual review is allowed only for TEXT answers");
     }
 
-    if (answer.isRevealed) {
-      throw new AppError(400, "Cannot review answer after reveal");
-    }
-
     const awardedPoints =
       payload.awardedPoints !== undefined
         ? payload.awardedPoints
@@ -888,6 +963,24 @@ export const adminService = {
       isCorrect: payload.isCorrect,
       awardedPoints,
     });
+
+    if (answer.isRevealed) {
+      const previousAwardedPoints = Number(answer.awardedPoints);
+      const deltaPoints = Number((awardedPoints - previousAwardedPoints).toFixed(2));
+      if (deltaPoints !== 0) {
+        await adminRepository.createDailyQuestionReviewAdjustmentActivity({
+          userId: answer.userId,
+          questionId: answer.questionId,
+          answerId,
+          previousAwardedPoints,
+          nextAwardedPoints: awardedPoints,
+          deltaPoints,
+          isCorrect: payload.isCorrect,
+          occurredAt: new Date(),
+          timezone: env.appTimezone,
+        });
+      }
+    }
 
     await adminRepository.createAdminActionLog({
       adminId,

@@ -930,9 +930,7 @@ function RamadanTaskCard({
       {expanded ? (
         <View style={styles.ramadanDetailBox}>
           <Text style={styles.ramadanDetailLine}>
-            {interactionKind === "CONDITIONAL"
-              ? t("tasks.conditionalHint")
-              : task.description || t("tasks.noDescription")}
+            {task.description || (interactionKind === "CONDITIONAL" ? t("tasks.conditionalHint") : t("tasks.noDescription"))}
           </Text>
         </View>
       ) : null}
@@ -946,7 +944,7 @@ function RamadanTaskCard({
       {inlineTasks.length > 0 ? (
         <View style={styles.inlineTaskGroup}>
           <Text style={styles.ramadanTimingLabel}>{t("tasks.inlineMinorTasks")}</Text>
-          <View style={styles.inlineTaskChips}>
+          <View style={styles.inlineTaskList}>
             {inlineTasks.map((item) => {
               const checked = selectedInlineTaskKeys.includes(item.key);
               return (
@@ -954,11 +952,14 @@ function RamadanTaskCard({
                   key={item.key}
                   onPress={() => onToggleInlineTaskKey(item.key)}
                   style={[
-                    styles.inlineTaskChip,
-                    checked ? styles.inlineTaskChipActiveRamadan : null,
+                    styles.inlineTaskTodoItem,
+                    checked ? styles.inlineTaskTodoItemActiveRamadan : null,
                   ]}
                 >
-                  <Text style={[styles.inlineTaskChipText, checked ? styles.inlineTaskChipTextActiveRamadan : null]}>
+                  <View style={[styles.inlineTaskTodoCheck, checked ? styles.inlineTaskTodoCheckActiveRamadan : null]}>
+                    {checked ? <Text style={styles.inlineTaskTodoCheckMark}>✓</Text> : null}
+                  </View>
+                  <Text style={[styles.inlineTaskTodoText, checked ? styles.inlineTaskTodoTextActiveRamadan : null]}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -1080,9 +1081,7 @@ function ModernTaskCard({
         {expanded ? (
           <View style={styles.modernConditionsBox}>
             <Text style={styles.modernConditionLine}>
-              {interactionKind === "CONDITIONAL"
-                ? t("tasks.conditionalHint")
-                : task.description || t("tasks.noDescription")}
+              {task.description || (interactionKind === "CONDITIONAL" ? t("tasks.conditionalHint") : t("tasks.noDescription"))}
             </Text>
           </View>
         ) : null}
@@ -1090,7 +1089,7 @@ function ModernTaskCard({
         {inlineTasks.length > 0 ? (
           <View style={styles.inlineTaskGroup}>
             <Text style={styles.modernTimingLabel}>{t("tasks.inlineMinorTasks")}</Text>
-            <View style={styles.inlineTaskChips}>
+            <View style={styles.inlineTaskList}>
               {inlineTasks.map((item) => {
                 const checked = selectedInlineTaskKeys.includes(item.key);
                 return (
@@ -1098,11 +1097,14 @@ function ModernTaskCard({
                     key={item.key}
                     onPress={() => onToggleInlineTaskKey(item.key)}
                     style={[
-                      styles.inlineTaskChip,
-                      checked ? styles.inlineTaskChipActiveModern : null,
+                      styles.inlineTaskTodoItem,
+                      checked ? styles.inlineTaskTodoItemActiveModern : null,
                     ]}
                   >
-                    <Text style={[styles.inlineTaskChipText, checked ? styles.inlineTaskChipTextActiveModern : null]}>
+                    <View style={[styles.inlineTaskTodoCheck, checked ? styles.inlineTaskTodoCheckActiveModern : null]}>
+                      {checked ? <Text style={styles.inlineTaskTodoCheckMark}>✓</Text> : null}
+                    </View>
+                    <Text style={[styles.inlineTaskTodoText, checked ? styles.inlineTaskTodoTextActiveModern : null]}>
                       {item.label}
                     </Text>
                   </Pressable>
@@ -1530,36 +1532,61 @@ const styles = StyleSheet.create({
   inlineTaskGroup: {
     gap: 6,
   },
-  inlineTaskChips: {
+  inlineTaskList: {
+    gap: 7,
+  },
+  inlineTaskTodoItem: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderColor: "#d6deea",
+    backgroundColor: "transparent",
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
   },
-  inlineTaskChip: {
+  inlineTaskTodoCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderColor: "#d0d8e6",
-    backgroundColor: "transparent",
+    borderColor: "#c2cedf",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  inlineTaskChipText: {
+  inlineTaskTodoCheckMark: {
+    color: "#1b1507",
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 12,
+  },
+  inlineTaskTodoText: {
     fontSize: 12,
     fontWeight: "700",
     color: "#5b6677",
+    flex: 1,
   },
-  inlineTaskChipActiveRamadan: {
+  inlineTaskTodoItemActiveRamadan: {
     borderColor: "#caa34f",
     backgroundColor: "rgba(202,163,79,0.2)",
   },
-  inlineTaskChipTextActiveRamadan: {
+  inlineTaskTodoCheckActiveRamadan: {
+    borderColor: "#b48c39",
+    backgroundColor: "#d6b56b",
+  },
+  inlineTaskTodoTextActiveRamadan: {
     color: "#4d3a16",
   },
-  inlineTaskChipActiveModern: {
+  inlineTaskTodoItemActiveModern: {
     borderColor: "#3f7df3",
     backgroundColor: "#eaf2ff",
   },
-  inlineTaskChipTextActiveModern: {
+  inlineTaskTodoCheckActiveModern: {
+    borderColor: "#2d66ce",
+    backgroundColor: "#3f7df3",
+  },
+  inlineTaskTodoTextActiveModern: {
     color: "#1c4da8",
   },
   bgOrb: {

@@ -107,7 +107,44 @@ export const adminRepository = {
         displayName: true,
         avatarUrl: true,
         role: true,
+        adminPermissions: true,
         isLeaderboardVisible: true,
+      },
+    });
+  },
+
+  findUserByEmail(email) {
+    return prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        adminPermissions: true,
+        isActive: true,
+      },
+    });
+  },
+
+  createAdminAccount(payload) {
+    return prisma.user.create({
+      data: {
+        email: payload.email,
+        displayName: payload.displayName,
+        passwordHash: payload.passwordHash,
+        role: payload.role,
+        adminPermissions: payload.role === "ADMIN" ? payload.adminPermissions : null,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        adminPermissions: true,
+        isActive: true,
+        createdAt: true,
       },
     });
   },
@@ -121,8 +158,27 @@ export const adminRepository = {
         displayName: true,
         avatarUrl: true,
         role: true,
+        adminPermissions: true,
         isActive: true,
         isLeaderboardVisible: true,
+      },
+    });
+  },
+
+  updateAdminAccess(userId, payload) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: payload.role,
+        adminPermissions: payload.role === "ADMIN" ? payload.adminPermissions : null,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        adminPermissions: true,
+        isActive: true,
       },
     });
   },
@@ -183,8 +239,10 @@ export const adminRepository = {
     return prisma.activity.findMany({
       where: {
         userId,
-        type: "TASK_COMPLETION",
         isForbidden: false,
+        type: {
+          in: ["TASK_COMPLETION", "MANUAL_ADJUSTMENT", "DAILY_QUESTION_ANSWER"],
+        },
       },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
       take: limit,
@@ -195,6 +253,7 @@ export const adminRepository = {
             key: true,
             title: true,
             type: true,
+            basePoints: true,
             config: true,
           },
         },
@@ -761,6 +820,30 @@ export const adminRepository = {
             email: true,
             displayName: true,
           },
+        },
+      },
+    });
+  },
+
+  createDailyQuestionReviewAdjustmentActivity(payload) {
+    return prisma.activity.create({
+      data: {
+        userId: payload.userId,
+        type: "DAILY_QUESTION_ANSWER",
+        occurredAt: payload.occurredAt,
+        timezone: payload.timezone,
+        isDuringFasting: false,
+        fastingMultiplier: 1,
+        basePoints: payload.deltaPoints,
+        effectivePoints: payload.deltaPoints,
+        note: "Daily question review adjustment",
+        metadata: {
+          questionId: payload.questionId,
+          answerId: payload.answerId,
+          previousAwardedPoints: payload.previousAwardedPoints,
+          nextAwardedPoints: payload.nextAwardedPoints,
+          isCorrect: payload.isCorrect,
+          isReviewAdjustment: true,
         },
       },
     });

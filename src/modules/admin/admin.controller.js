@@ -1,5 +1,6 @@
 import {
   adminLeaderboardQuerySchema,
+  createAdminAccountSchema,
   createCounterSchema,
   createDailyQuestionSchema,
   createManualAdjustmentSchema,
@@ -21,10 +22,12 @@ import {
   reviewDailyQuestionAnswerSchema,
   taskParamsSchema,
   taskCounterRuleParamsSchema,
+  updateAdminAccessSchema,
   updateDailyQuestionSchema,
   userParamsSchema,
   updateTaskSchema,
 } from "./admin.validator.js";
+import { ADMIN_PERMISSION_KEYS } from "../../core/auth/admin-permissions.js";
 import { adminService } from "./admin.service.js";
 
 export async function createCounter(req, res) {
@@ -210,6 +213,25 @@ export async function revealDailyQuestionAnswers(req, res) {
 export async function getLeaderboard(req, res) {
   const query = adminLeaderboardQuerySchema.parse(req.query);
   const data = await adminService.getLeaderboard(req.auth, query);
+
+  res.status(200).json({ data });
+}
+
+export async function listPermissionKeys(_req, res) {
+  res.status(200).json({ data: ADMIN_PERMISSION_KEYS });
+}
+
+export async function createAdminAccount(req, res) {
+  const payload = createAdminAccountSchema.parse(req.body);
+  const data = await adminService.createAdminAccount(req.auth, payload);
+
+  res.status(201).json({ data });
+}
+
+export async function updateAdminAccess(req, res) {
+  const { id } = userParamsSchema.parse(req.params);
+  const payload = updateAdminAccessSchema.parse(req.body);
+  const data = await adminService.updateAdminAccess(req.auth, id, payload);
 
   res.status(200).json({ data });
 }

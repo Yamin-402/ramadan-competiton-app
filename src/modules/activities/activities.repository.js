@@ -101,6 +101,14 @@ export const activitiesRepository = {
           return false;
         }
 
+        const sourceRaw =
+          typeof config.conditionalChildSource === "string"
+            ? config.conditionalChildSource.trim().toUpperCase()
+            : null;
+        if (sourceRaw === "NEW_CHILD_TASKS") {
+          return false;
+        }
+
         const childIds = Array.isArray(config.conditionalChildTaskIds)
           ? config.conditionalChildTaskIds
               .map((value) => Number(value))
@@ -233,6 +241,7 @@ export const activitiesRepository = {
             key: true,
             title: true,
             type: true,
+            basePoints: true,
             config: true,
             categoryTag: {
               select: {
@@ -273,6 +282,7 @@ export const activitiesRepository = {
             key: true,
             title: true,
             type: true,
+            basePoints: true,
             config: true,
             categoryTag: {
               select: {

@@ -74,16 +74,70 @@ function formatSignedPoints(value: number | string): string {
   return "0.00";
 }
 
-function getTaskTypeLabel(item: AdminUserActivity): string {
-  const flowType =
+function getActivityMetadata(item: AdminUserActivity): Record<string, unknown> | null {
+  if (!item.metadata || typeof item.metadata !== "object" || Array.isArray(item.metadata)) {
+    return null;
+  }
+
+  return item.metadata as Record<string, unknown>;
+}
+
+function getTaskSnapshot(item: AdminUserActivity) {
+  const metadata = getActivityMetadata(item);
+  const snapshotRaw = metadata?.taskSnapshot;
+  const snapshot =
+    snapshotRaw && typeof snapshotRaw === "object" && !Array.isArray(snapshotRaw)
+      ? (snapshotRaw as Record<string, unknown>)
+      : null;
+
+  const flowTypeFromTask =
     item.task?.config && typeof item.task.config === "object"
       ? String((item.task.config as Record<string, unknown>).taskFlowType || "").toUpperCase()
       : "";
+  const flowTypeFromSnapshot =
+    snapshot && typeof snapshot.flowType === "string" ? snapshot.flowType.trim().toUpperCase() : "";
+
+  return {
+    title:
+      (snapshot && typeof snapshot.title === "string" ? snapshot.title : null) ||
+      item.task?.title ||
+      null,
+    type:
+      (snapshot && typeof snapshot.type === "string" ? snapshot.type.trim().toUpperCase() : null) ||
+      item.task?.type ||
+      null,
+    flowType: flowTypeFromSnapshot || flowTypeFromTask || "",
+    basePoints:
+      (snapshot && Number.isFinite(Number(snapshot.basePoints)) ? Number(snapshot.basePoints) : null) ||
+      Number(item.task?.basePoints),
+  };
+}
+
+function getActivityTitle(item: AdminUserActivity): string {
+  if (item.type === "DAILY_QUESTION_ANSWER") {
+    return "Daily question";
+  }
+  if (item.type === "MANUAL_ADJUSTMENT") {
+    return "Manual points adjustment";
+  }
+
+  return getTaskSnapshot(item).title || item.type;
+}
+
+function getTaskTypeLabel(item: AdminUserActivity): string {
+  if (item.type === "DAILY_QUESTION_ANSWER") {
+    return "Daily question";
+  }
+  if (item.type === "MANUAL_ADJUSTMENT") {
+    return "Manual adjustment";
+  }
+
+  const flowType = getTaskSnapshot(item).flowType;
   if (flowType === "TIMED") {
     return "Timed";
   }
 
-  const type = item.task?.type || "NORMAL";
+  const type = getTaskSnapshot(item).type || "NORMAL";
   if (type === "COUNTER") {
     return "Numeric";
   }
@@ -100,20 +154,11 @@ function getTaskTypeLabel(item: AdminUserActivity): string {
 }
 
 function getTaskFlowType(item: AdminUserActivity): string {
-  if (item.task?.config && typeof item.task.config === "object") {
-    const flow = (item.task.config as Record<string, unknown>).taskFlowType;
-    if (typeof flow === "string") {
-      return flow.trim().toUpperCase();
-    }
-  }
-  return "";
+  return getTaskSnapshot(item).flowType;
 }
 
 function resolveEnteredAmount(item: AdminUserActivity): number | null {
-  const metadata =
-    item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
-      ? (item.metadata as Record<string, unknown>)
-      : null;
+  const metadata = getActivityMetadata(item);
   if (!metadata) {
     return null;
   }
@@ -124,17 +169,28 @@ function resolveEnteredAmount(item: AdminUserActivity): number | null {
   }
 
   const pointUnits = Number(metadata.pointUnits);
-  if (!Number.isFinite(pointUnits)) {
-    return null;
+  if (Number.isFinite(pointUnits)) {
+    const flowType = getTaskFlowType(item);
+    if (flowType === "TIMED") {
+      return pointUnits * 60;
+    }
+
+    if (item.task?.type === "COUNTER" || flowType === "COUNTER") {
+      return pointUnits;
+    }
   }
 
-  const flowType = getTaskFlowType(item);
-  if (flowType === "TIMED") {
-    return pointUnits * 60;
-  }
-
-  if (item.task?.type === "COUNTER" || flowType === "COUNTER") {
-    return pointUnits;
+  const snapshot = getTaskSnapshot(item);
+  const effectiveBasePoints = Math.abs(toNumber(item.basePoints));
+  const taskBasePoints = Math.abs(Number(snapshot.basePoints));
+  if (Number.isFinite(taskBasePoints) && taskBasePoints > 0 && Number.isFinite(effectiveBasePoints)) {
+    const units = effectiveBasePoints / taskBasePoints;
+    if (Number.isFinite(units) && units > 0) {
+      if (snapshot.flowType === "TIMED") {
+        return units * 60;
+      }
+      return units;
+    }
   }
 
   return null;
@@ -383,9 +439,15 @@ export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryM
                           {day.items.map((item) => (
                             <tr key={item.id}>
                               <td>{getCairoTimeLabel(new Date(item.occurredAt))}</td>
-                              <td>{item.task?.title || item.type}</td>
+                              <td>{getActivityTitle(item)}</td>
                               <td>{getTaskTypeLabel(item)}</td>
-                              <td>{item.isDuringFasting ? "During fasting" : "Outside fasting"}</td>
+                              <td>
+                                {item.type === "TASK_COMPLETION"
+                                  ? item.isDuringFasting
+                                    ? "During fasting"
+                                    : "Outside fasting"
+                                  : "-"}
+                              </td>
                               <td>
                                 {formatAmountCell(item)}
                               </td>

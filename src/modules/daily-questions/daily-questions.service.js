@@ -132,18 +132,22 @@ export const dailyQuestionsService = {
   async getMyHistory(auth, query) {
     const userId = getAuthUserId(auth);
     await revealDueAnswersByFajr(new Date());
+    const competitionDate = await resolveCompetitionDateByFajr(new Date());
     const rows = await dailyQuestionsRepository.listUserHistory(userId, query.limit);
 
     return rows.map((row) => ({
-      id: row.id,
-      question: sanitizeQuestionForUser(row.question),
-      questionCorrectAnswer: row.isRevealed ? row.question.correctAnswer : null,
-      answer: row.answer,
-      status: row.isRevealed ? "revealed" : "pending",
-      isCorrect: row.isRevealed ? row.isCorrect : null,
-      awardedPoints: row.isRevealed ? Number(row.awardedPoints) : 0,
-      createdAt: row.createdAt,
-      revealedAt: row.revealedAt,
+      id: row.answers[0]?.id || row.id * -1,
+      question: sanitizeQuestionForUser(row),
+      questionCorrectAnswer:
+        row.answers[0]?.isRevealed || row.activeDate < competitionDate ? row.correctAnswer : null,
+      answer: row.answers[0]?.answer || null,
+      didAnswer: Boolean(row.answers[0]),
+      status:
+        row.answers[0]?.isRevealed || row.activeDate < competitionDate ? "revealed" : "pending",
+      isCorrect: row.answers[0]?.isRevealed ? row.answers[0].isCorrect : null,
+      awardedPoints: row.answers[0]?.isRevealed ? Number(row.answers[0].awardedPoints) : 0,
+      createdAt: row.answers[0]?.createdAt || row.activeDate,
+      revealedAt: row.answers[0]?.revealedAt || null,
     }));
   },
 };

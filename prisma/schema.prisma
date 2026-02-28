@@ -97,6 +97,7 @@ model User {
   isStreakPublic         Boolean                @default(true)
   isLeaderboardVisible   Boolean                @default(true)
   role                   UserRole               @default(USER)
+  adminPermissions       Json?
   isActive               Boolean                @default(true)
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt

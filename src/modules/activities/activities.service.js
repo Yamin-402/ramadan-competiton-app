@@ -94,6 +94,15 @@ function getConfigObject(task) {
   return config;
 }
 
+function parseConditionalChildSource(task) {
+  const raw = configString(task, "conditionalChildSource")?.toUpperCase();
+  if (raw === "EXISTING_TASKS" || raw === "NEW_CHILD_TASKS") {
+    return raw;
+  }
+
+  return null;
+}
+
 function parsePositiveIdArray(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -145,6 +154,11 @@ function parseConditionalRewardTiers(task) {
 }
 
 function parseConditionalChildConfig(task) {
+  const childSource = parseConditionalChildSource(task);
+  if (childSource === "NEW_CHILD_TASKS") {
+    return null;
+  }
+
   const config = getConfigObject(task);
   if (!config) {
     return null;
@@ -167,6 +181,11 @@ function parseConditionalChildConfig(task) {
 }
 
 function parseConditionalInlineConfig(task) {
+  const childSource = parseConditionalChildSource(task);
+  if (childSource === "EXISTING_TASKS") {
+    return null;
+  }
+
   const config = getConfigObject(task);
   if (!config) {
     return null;
@@ -825,6 +844,7 @@ export const activitiesService = {
       payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
         ? { ...payload.metadata }
         : {};
+    const taskFlowType = configString(task, "taskFlowType")?.toUpperCase() || null;
     const inlineConditionalConfig =
       task.type === "CONDITIONAL" ? parseConditionalInlineConfig(task) : null;
 
@@ -880,6 +900,15 @@ export const activitiesService = {
       note: payload.note,
       metadata: {
         ...activityMetadata,
+        taskSnapshot: {
+          id: task.id,
+          key: task.key,
+          title: task.title,
+          type: task.type,
+          flowType: taskFlowType,
+          basePoints: Number(task.basePoints),
+          isForbidden: task.type === "FORBIDDEN",
+        },
         streakMultiplier,
         pointUnits,
         activityAmount: typeof payload.amount === "number" ? payload.amount : null,

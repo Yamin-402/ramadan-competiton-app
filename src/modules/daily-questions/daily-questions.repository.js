@@ -46,21 +46,29 @@ export const dailyQuestionsRepository = {
   },
 
   listUserHistory(userId, limit) {
-    return prisma.dailyQuestionAnswer.findMany({
-      where: { userId },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    return prisma.dailyQuestion.findMany({
+      orderBy: [{ activeDate: "desc" }, { id: "desc" }],
       take: limit,
-      include: {
-        question: {
+      select: {
+        id: true,
+        questionText: true,
+        answerType: true,
+        options: true,
+        correctAnswer: true,
+        points: true,
+        activeDate: true,
+        isActive: true,
+        answers: {
+          where: { userId },
+          take: 1,
           select: {
             id: true,
-            questionText: true,
-            answerType: true,
-            options: true,
-            correctAnswer: true,
-            points: true,
-            activeDate: true,
-            isActive: true,
+            answer: true,
+            isCorrect: true,
+            awardedPoints: true,
+            isRevealed: true,
+            revealedAt: true,
+            createdAt: true,
           },
         },
       },

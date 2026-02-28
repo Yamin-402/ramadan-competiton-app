@@ -161,7 +161,7 @@ export function TaskItemCard({
       {inlineTasks.length > 0 ? (
         <View style={styles.inlineTasksWrap}>
           <Text style={[styles.inlineTasksLabel, { color: colors.textSecondary }]}>{t("tasks.inlineMinorTasks")}</Text>
-          <View style={styles.inlineTasksRow}>
+          <View style={styles.inlineTasksList}>
             {inlineTasks.map((item) => {
               const checked = selectedInlineTaskKeys.includes(item.key);
               return (
@@ -169,14 +169,25 @@ export function TaskItemCard({
                   key={item.key}
                   onPress={() => onToggleInlineTaskKey?.(item.key)}
                   style={[
-                    styles.inlineTaskChip,
+                    styles.inlineTaskTodoItem,
                     {
                       borderColor: checked ? colors.gold : colors.border,
-                      backgroundColor: checked ? `${colors.gold}22` : "transparent",
+                      backgroundColor: checked ? `${colors.gold}20` : "transparent",
                     },
                   ]}
                 >
-                  <Text style={{ color: checked ? colors.textPrimary : colors.textSecondary, fontWeight: "700" }}>
+                  <View
+                    style={[
+                      styles.inlineTaskTodoCheck,
+                      {
+                        borderColor: checked ? colors.gold : colors.border,
+                        backgroundColor: checked ? colors.gold : "transparent",
+                      },
+                    ]}
+                  >
+                    {checked ? <Text style={styles.inlineTaskTodoCheckMark}>✓</Text> : null}
+                  </View>
+                  <Text style={{ color: checked ? colors.textPrimary : colors.textSecondary, fontWeight: "700", flex: 1 }}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -271,15 +282,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  inlineTasksRow: {
+  inlineTasksList: {
+    gap: 6,
+  },
+  inlineTaskTodoItem: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
   },
-  inlineTaskChip: {
+  inlineTaskTodoCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineTaskTodoCheckMark: {
+    color: "#1b1507",
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 12,
   },
 });

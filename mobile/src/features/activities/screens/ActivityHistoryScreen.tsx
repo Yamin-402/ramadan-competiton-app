@@ -71,16 +71,60 @@ function formatSignedPoints(value: number | string) {
   return "0";
 }
 
-function getTaskTypeLabel(item: Activity, t: ReturnType<typeof useI18n>["t"]) {
-  const flowType =
+function getActivityMetadata(item: Activity): Record<string, unknown> | null {
+  if (!item.metadata || typeof item.metadata !== "object" || Array.isArray(item.metadata)) {
+    return null;
+  }
+
+  return item.metadata as Record<string, unknown>;
+}
+
+function getTaskSnapshot(item: Activity) {
+  const metadata = getActivityMetadata(item);
+  const snapshotRaw = metadata?.taskSnapshot;
+  const snapshot =
+    snapshotRaw && typeof snapshotRaw === "object" && !Array.isArray(snapshotRaw)
+      ? (snapshotRaw as Record<string, unknown>)
+      : null;
+
+  const flowTypeFromTask =
     item.task?.config && typeof item.task.config === "object"
       ? String((item.task.config as Record<string, unknown>).taskFlowType || "").toUpperCase()
       : "";
+  const flowTypeFromSnapshot =
+    snapshot && typeof snapshot.flowType === "string" ? snapshot.flowType.trim().toUpperCase() : "";
+
+  return {
+    title:
+      (snapshot && typeof snapshot.title === "string" ? snapshot.title : null) ||
+      item.task?.title ||
+      null,
+    type:
+      (snapshot && typeof snapshot.type === "string" ? snapshot.type.trim().toUpperCase() : null) ||
+      item.task?.type ||
+      null,
+    flowType: flowTypeFromSnapshot || flowTypeFromTask || "",
+    basePoints:
+      (snapshot && Number.isFinite(Number(snapshot.basePoints)) ? Number(snapshot.basePoints) : null) ||
+      Number(item.task?.basePoints),
+  };
+}
+
+function getTaskTypeLabel(item: Activity, t: ReturnType<typeof useI18n>["t"]) {
+  if (item.type === "DAILY_QUESTION_ANSWER") {
+    return t("activityHistory.dailyQuestion");
+  }
+  if (item.type === "MANUAL_ADJUSTMENT") {
+    return t("activityHistory.manualAdjustment");
+  }
+
+  const snapshot = getTaskSnapshot(item);
+  const flowType = snapshot.flowType;
   if (flowType === "TIMED") {
     return t("tasks.typeTimed");
   }
 
-  const type = item.task?.type || "NORMAL";
+  const type = snapshot.type || "NORMAL";
   if (type === "COUNTER") {
     return t("tasks.typeNumeric");
   }
@@ -94,6 +138,53 @@ function getTaskTypeLabel(item: Activity, t: ReturnType<typeof useI18n>["t"]) {
     return t("tasks.streakLabel");
   }
   return t("tasks.typeNormal");
+}
+
+function getActivityTitle(item: Activity, t: ReturnType<typeof useI18n>["t"]) {
+  if (item.type === "DAILY_QUESTION_ANSWER") {
+    return t("activityHistory.dailyQuestion");
+  }
+  if (item.type === "MANUAL_ADJUSTMENT") {
+    return t("activityHistory.manualAdjustment");
+  }
+
+  return getTaskSnapshot(item).title || t("activityHistory.taskEntry");
+}
+
+function resolveEnteredAmount(item: Activity): number | null {
+  const metadata = getActivityMetadata(item);
+  if (!metadata) {
+    return null;
+  }
+
+  const directAmount = Number(metadata.activityAmount);
+  if (Number.isFinite(directAmount)) {
+    return directAmount;
+  }
+
+  const pointUnits = Number(metadata.pointUnits);
+  if (Number.isFinite(pointUnits)) {
+    const flowType = getTaskSnapshot(item).flowType;
+    if (flowType === "TIMED") {
+      return pointUnits * 60;
+    }
+    return pointUnits;
+  }
+
+  const snapshot = getTaskSnapshot(item);
+  const effectiveBasePoints = Math.abs(toNumber(item.basePoints));
+  const taskBasePoints = Math.abs(Number(snapshot.basePoints));
+  if (Number.isFinite(taskBasePoints) && taskBasePoints > 0 && Number.isFinite(effectiveBasePoints)) {
+    const units = effectiveBasePoints / taskBasePoints;
+    if (Number.isFinite(units) && units > 0) {
+      if (snapshot.flowType === "TIMED") {
+        return units * 60;
+      }
+      return units;
+    }
+  }
+
+  return null;
 }
 
 export function ActivityHistoryScreen() {
@@ -135,7 +226,11 @@ export function ActivityHistoryScreen() {
   );
 
   const groupedDays = useMemo<DayGroup[]>(() => {
-    const taskRows = rows.filter((row) => row.type === "TASK_COMPLETION" && row.task);
+    const taskRows = rows.filter((row) =>
+      row.type === "TASK_COMPLETION" ||
+      row.type === "DAILY_QUESTION_ANSWER" ||
+      row.type === "MANUAL_ADJUSTMENT"
+    );
     const map = new Map<string, DayGroup>();
 
     for (const row of taskRows) {
@@ -169,14 +264,24 @@ export function ActivityHistoryScreen() {
   const overallPoints = useMemo(
     () =>
       rows
-        .filter((row) => row.type === "TASK_COMPLETION" && row.task)
+        .filter(
+          (row) =>
+            row.type === "TASK_COMPLETION" ||
+            row.type === "DAILY_QUESTION_ANSWER" ||
+            row.type === "MANUAL_ADJUSTMENT"
+        )
         .reduce((sum, row) => sum + toNumber(row.effectivePoints), 0),
     [rows]
   );
   const pointsGained = useMemo(
     () =>
       rows
-        .filter((row) => row.type === "TASK_COMPLETION" && row.task)
+        .filter(
+          (row) =>
+            row.type === "TASK_COMPLETION" ||
+            row.type === "DAILY_QUESTION_ANSWER" ||
+            row.type === "MANUAL_ADJUSTMENT"
+        )
         .map((row) => toNumber(row.effectivePoints))
         .filter((value) => value > 0)
         .reduce((sum, value) => sum + value, 0),
@@ -185,7 +290,12 @@ export function ActivityHistoryScreen() {
   const pointsLost = useMemo(
     () =>
       rows
-        .filter((row) => row.type === "TASK_COMPLETION" && row.task)
+        .filter(
+          (row) =>
+            row.type === "TASK_COMPLETION" ||
+            row.type === "DAILY_QUESTION_ANSWER" ||
+            row.type === "MANUAL_ADJUSTMENT"
+        )
         .map((row) => toNumber(row.effectivePoints))
         .filter((value) => value < 0)
         .reduce((sum, value) => sum + Math.abs(value), 0),
@@ -317,17 +427,30 @@ export function ActivityHistoryScreen() {
                       </View>
                     </View>
                     {day.items.map((item) => {
+                      const enteredAmount = resolveEnteredAmount(item);
+                      const snapshot = getTaskSnapshot(item);
                       const counterAmount =
                         item.counterDeltas.length > 0
                           ? item.counterDeltas
                               .map((delta) => `${delta.counter.name}: ${formatPoints(delta.delta)}`)
                               .join(" | ")
                           : "-";
+                      const showAmount =
+                        item.type === "TASK_COMPLETION" &&
+                        (enteredAmount !== null || item.counterDeltas.length > 0);
+                      const amountLabel =
+                        enteredAmount !== null
+                          ? snapshot.flowType === "TIMED"
+                            ? `${formatPoints(Math.round(enteredAmount))} ${t("activityHistory.minutes")}`
+                            : formatPoints(enteredAmount)
+                          : counterAmount;
 
                       return (
                         <View key={item.id} style={[styles.row, variantRowStyle]}>
                           <View style={styles.rowTop}>
-                            <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>{item.task?.title || item.type}</Text>
+                            <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+                              {getActivityTitle(item, t)}
+                            </Text>
                             <Text
                               style={[
                                 styles.rowPoints,
@@ -346,14 +469,16 @@ export function ActivityHistoryScreen() {
                           <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
                             {t("activityHistory.taskType")}: {getTaskTypeLabel(item, t)}
                           </Text>
-                          <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
-                            {item.isDuringFasting
-                              ? t("activityHistory.duringFasting")
-                              : t("activityHistory.outsideFasting")}
-                          </Text>
-                          {item.counterDeltas.length > 0 ? (
+                          {item.type === "TASK_COMPLETION" ? (
                             <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
-                              {t("activityHistory.amount")}: {counterAmount}
+                              {item.isDuringFasting
+                                ? t("activityHistory.duringFasting")
+                                : t("activityHistory.outsideFasting")}
+                            </Text>
+                          ) : null}
+                          {showAmount ? (
+                            <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
+                              {t("activityHistory.amount")}: {amountLabel}
                             </Text>
                           ) : null}
                         </View>

@@ -14,6 +14,7 @@ import { NotificationsModule } from "./modules/NotificationsModule";
 import { DailyQuestionsModule } from "./modules/DailyQuestionsModule";
 import { LeaderboardModule } from "./modules/LeaderboardModule";
 import { UserTaskHistoryModule } from "./modules/UserTaskHistoryModule";
+import { AdminAccessModule } from "./modules/AdminAccessModule";
 
 type ModuleKey =
   | "dashboard"
@@ -24,9 +25,10 @@ type ModuleKey =
   | "notifications"
   | "dailyQuestions"
   | "leaderboard"
-  | "userTaskHistory";
+  | "userTaskHistory"
+  | "adminAccess";
 
-const moduleItems: Array<{ key: ModuleKey; label: string }> = [
+const baseModuleItems: Array<{ key: ModuleKey; label: string }> = [
   { key: "dashboard", label: "Dashboard" },
   { key: "tasks", label: "Tasks" },
   { key: "counters", label: "Counters" },
@@ -48,6 +50,14 @@ export default function App() {
   const [historyTargetUserId, setHistoryTargetUserId] = useState<number | null>(null);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referenceError, setReferenceError] = useState<string | null>(null);
+
+  const moduleItems = useMemo(() => {
+    if (session?.user.role === "SUPER_ADMIN") {
+      return [...baseModuleItems, { key: "adminAccess" as ModuleKey, label: "Admin Access" }];
+    }
+
+    return baseModuleItems;
+  }, [session?.user.role]);
 
   const refreshReferences = useCallback(async () => {
     setLoadingReferences(true);
@@ -180,6 +190,10 @@ export default function App() {
 
         {activeModule === "userTaskHistory" ? (
           <UserTaskHistoryModule users={users} initialUserId={historyTargetUserId} />
+        ) : null}
+
+        {activeModule === "adminAccess" && session.user.role === "SUPER_ADMIN" ? (
+          <AdminAccessModule users={users} onRefreshReferences={refreshReferences} />
         ) : null}
       </main>
     </div>
