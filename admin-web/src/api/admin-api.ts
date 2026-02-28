@@ -209,6 +209,7 @@ export const adminApi = {
     answerType: "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
     options?: unknown;
     correctAnswer?: unknown;
+    answerExplanation?: string;
     points?: number;
     activeDate: string;
     isActive?: boolean;
@@ -235,6 +236,7 @@ export const adminApi = {
       answerType?: "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
       options?: unknown;
       correctAnswer?: unknown;
+      answerExplanation?: string;
       points?: number;
       activeDate?: string;
       isActive?: boolean;

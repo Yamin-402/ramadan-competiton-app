@@ -793,6 +793,7 @@ export const adminRepository = {
         question: {
           select: {
             id: true,
+            questionText: true,
             answerType: true,
             points: true,
             isActive: true,
@@ -840,6 +841,8 @@ export const adminRepository = {
         metadata: {
           questionId: payload.questionId,
           answerId: payload.answerId,
+          questionText: payload.questionText,
+          answerType: payload.answerType,
           previousAwardedPoints: payload.previousAwardedPoints,
           nextAwardedPoints: payload.nextAwardedPoints,
           isCorrect: payload.isCorrect,
@@ -855,6 +858,14 @@ export const adminRepository = {
         where: {
           questionId,
           isRevealed: false,
+        },
+        include: {
+          question: {
+            select: {
+              questionText: true,
+              answerType: true,
+            },
+          },
         },
       });
 
@@ -883,6 +894,8 @@ export const adminRepository = {
             note: "Daily question revealed",
             metadata: {
               questionId,
+              questionText: answer.question.questionText,
+              answerType: answer.question.answerType,
               isCorrect: answer.isCorrect,
             },
           })),

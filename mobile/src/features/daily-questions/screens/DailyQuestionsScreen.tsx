@@ -60,20 +60,46 @@ function getRamadanDayByActiveDate(activeDate: string) {
   return getRamadanDayNumber(new Date(normalized));
 }
 
+function unwrapAnswerValue(answer: unknown): unknown {
+  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
+    const value = (answer as Record<string, unknown>).value;
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return answer;
+}
+
+function extractAnswerExplanation(answer: unknown): string | null {
+  if (!answer || typeof answer !== "object" || Array.isArray(answer)) {
+    return null;
+  }
+
+  const value = (answer as Record<string, unknown>).explanation;
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function formatAnswerForDisplay(answer: unknown, t: ReturnType<typeof useI18n>["t"]): string {
-  if (answer === null || answer === undefined) {
+  const normalized = unwrapAnswerValue(answer);
+  if (normalized === null || normalized === undefined) {
     return "-";
   }
-  if (typeof answer === "boolean") {
-    return answer ? t("common.yes") : t("common.no");
+  if (typeof normalized === "boolean") {
+    return normalized ? t("common.yes") : t("common.no");
   }
-  if (Array.isArray(answer)) {
-    return answer.map((item) => String(item)).join(" | ");
+  if (Array.isArray(normalized)) {
+    return normalized.map((item) => String(item)).join(" | ");
   }
-  if (typeof answer === "object") {
-    return JSON.stringify(answer);
+  if (typeof normalized === "object") {
+    return JSON.stringify(normalized);
   }
-  return String(answer);
+  return String(normalized);
 }
 
 export function DailyQuestionsScreen() {
@@ -461,6 +487,12 @@ export function DailyQuestionsScreen() {
                         ? formatAnswerForDisplay(todayAnswer.questionCorrectAnswer, t)
                         : t("daily.revealLater")}
                     </Text>
+                    {todayAnswer.status === "revealed" &&
+                    extractAnswerExplanation(todayAnswer.questionCorrectAnswer) ? (
+                      <Text style={{ color: colors.textSecondary, textAlign }}>
+                        {extractAnswerExplanation(todayAnswer.questionCorrectAnswer)}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : (
                   <>
@@ -568,6 +600,12 @@ export function DailyQuestionsScreen() {
                                 ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
                                 : t("daily.revealLater")}
                             </Text>
+                            {item.status === "revealed" &&
+                            extractAnswerExplanation(item.questionCorrectAnswer) ? (
+                              <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
+                                {extractAnswerExplanation(item.questionCorrectAnswer)}
+                              </Text>
+                            ) : null}
                           </View>
 
                           <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>

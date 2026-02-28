@@ -151,7 +151,92 @@ function getActivityTitle(item: Activity, t: ReturnType<typeof useI18n>["t"]) {
   return getTaskSnapshot(item).title || t("activityHistory.taskEntry");
 }
 
+function getAnswerTypeLabel(
+  answerType: unknown,
+  t: ReturnType<typeof useI18n>["t"]
+): string | null {
+  const type = typeof answerType === "string" ? answerType.trim().toUpperCase() : "";
+  if (!type) {
+    return null;
+  }
+
+  if (type === "TEXT") {
+    return t("activityHistory.answerTypeText");
+  }
+  if (type === "SINGLE_CHOICE") {
+    return t("activityHistory.answerTypeSingleChoice");
+  }
+  if (type === "MULTIPLE_CHOICE") {
+    return t("activityHistory.answerTypeMultipleChoice");
+  }
+  if (type === "BOOLEAN") {
+    return t("activityHistory.answerTypeBoolean");
+  }
+
+  return type;
+}
+
+function getTaskFlowType(item: Activity): string {
+  return getTaskSnapshot(item).flowType;
+}
+
+function normalizeInlineTaskKey(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getInlineTaskLabelFromTaskConfig(
+  item: Activity,
+  key: string,
+  isArabic: boolean
+): string | null {
+  const config = item.task?.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return null;
+  }
+
+  const rawInlineTasks = (config as Record<string, unknown>).conditionalInlineTasks;
+  if (!Array.isArray(rawInlineTasks)) {
+    return null;
+  }
+
+  const wanted = normalizeInlineTaskKey(key);
+  const matched = rawInlineTasks.find((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return false;
+    }
+    const row = entry as Record<string, unknown>;
+    return normalizeInlineTaskKey(row.key) === wanted;
+  });
+
+  if (!matched || typeof matched !== "object" || Array.isArray(matched)) {
+    return null;
+  }
+
+  const row = matched as Record<string, unknown>;
+  const labelAr = typeof row.titleAr === "string" ? row.titleAr.trim() : "";
+  const labelEn = typeof row.titleEn === "string" ? row.titleEn.trim() : "";
+  const label = isArabic ? labelAr || labelEn : labelEn || labelAr;
+  return label || null;
+}
+
+function friendlyInlineKeyLabel(key: string): string {
+  const cleaned = key.replace(/[_-]+/g, " ").trim();
+  if (!cleaned) {
+    return key;
+  }
+
+  return cleaned;
+}
+
 function resolveEnteredAmount(item: Activity): number | null {
+  const snapshot = getTaskSnapshot(item);
+  const flowType = snapshot.flowType;
+  const isAmountTask =
+    flowType === "TIMED" || flowType === "COUNTER" || snapshot.type === "COUNTER";
+  if (!isAmountTask) {
+    return null;
+  }
+
   const metadata = getActivityMetadata(item);
   if (!metadata) {
     return null;
@@ -164,14 +249,12 @@ function resolveEnteredAmount(item: Activity): number | null {
 
   const pointUnits = Number(metadata.pointUnits);
   if (Number.isFinite(pointUnits)) {
-    const flowType = getTaskSnapshot(item).flowType;
     if (flowType === "TIMED") {
       return pointUnits * 60;
     }
     return pointUnits;
   }
 
-  const snapshot = getTaskSnapshot(item);
   const effectiveBasePoints = Math.abs(toNumber(item.basePoints));
   const taskBasePoints = Math.abs(Number(snapshot.basePoints));
   if (Number.isFinite(taskBasePoints) && taskBasePoints > 0 && Number.isFinite(effectiveBasePoints)) {
@@ -185,6 +268,47 @@ function resolveEnteredAmount(item: Activity): number | null {
   }
 
   return null;
+}
+
+function getInlineMinorTaskLabels(
+  item: Activity,
+  isArabic: boolean
+): string[] {
+  const metadata = getActivityMetadata(item);
+  if (!metadata) {
+    return [];
+  }
+
+  const selectedInlineTasksRaw = metadata.selectedInlineTasks;
+  if (Array.isArray(selectedInlineTasksRaw)) {
+    const labels = selectedInlineTasksRaw
+      .map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          return null;
+        }
+
+        const row = entry as Record<string, unknown>;
+        const labelAr = typeof row.titleAr === "string" ? row.titleAr.trim() : "";
+        const labelEn = typeof row.titleEn === "string" ? row.titleEn.trim() : "";
+        const label = isArabic ? labelAr || labelEn : labelEn || labelAr;
+        return label || null;
+      })
+      .filter((label): label is string => Boolean(label));
+
+    if (labels.length > 0) {
+      return labels;
+    }
+  }
+
+  const selectedInlineTaskKeysRaw = metadata.selectedInlineTaskKeys;
+  if (!Array.isArray(selectedInlineTaskKeysRaw)) {
+    return [];
+  }
+
+  return selectedInlineTaskKeysRaw
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .map((key) => getInlineTaskLabelFromTaskConfig(item, key, isArabic) || friendlyInlineKeyLabel(key));
 }
 
 export function ActivityHistoryScreen() {
@@ -429,21 +553,37 @@ export function ActivityHistoryScreen() {
                     {day.items.map((item) => {
                       const enteredAmount = resolveEnteredAmount(item);
                       const snapshot = getTaskSnapshot(item);
+                      const metadata = getActivityMetadata(item);
+                      const flowType = getTaskFlowType(item);
+                      const isAmountTask =
+                        item.type === "TASK_COMPLETION" &&
+                        (flowType === "TIMED" || flowType === "COUNTER" || snapshot.type === "COUNTER");
                       const counterAmount =
                         item.counterDeltas.length > 0
                           ? item.counterDeltas
                               .map((delta) => `${delta.counter.name}: ${formatPoints(delta.delta)}`)
                               .join(" | ")
                           : "-";
-                      const showAmount =
-                        item.type === "TASK_COMPLETION" &&
-                        (enteredAmount !== null || item.counterDeltas.length > 0);
+                      const showAmount = isAmountTask && (enteredAmount !== null || item.counterDeltas.length > 0);
                       const amountLabel =
                         enteredAmount !== null
                           ? snapshot.flowType === "TIMED"
                             ? `${formatPoints(Math.round(enteredAmount))} ${t("activityHistory.minutes")}`
                             : formatPoints(enteredAmount)
                           : counterAmount;
+                      const inlineMinorTasks = getInlineMinorTaskLabels(item, isArabic);
+                      const dailyQuestionResult =
+                        item.type === "DAILY_QUESTION_ANSWER"
+                          ? metadata?.isCorrect === true
+                            ? t("activityHistory.correct")
+                            : metadata?.isCorrect === false
+                              ? t("activityHistory.wrong")
+                              : t("daily.pending")
+                          : null;
+                      const dailyQuestionAnswerType =
+                        item.type === "DAILY_QUESTION_ANSWER"
+                          ? getAnswerTypeLabel(metadata?.answerType, t) || t("activityHistory.answerTypeUnknown")
+                          : null;
 
                       return (
                         <View key={item.id} style={[styles.row, variantRowStyle]}>
@@ -479,6 +619,28 @@ export function ActivityHistoryScreen() {
                           {showAmount ? (
                             <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
                               {t("activityHistory.amount")}: {amountLabel}
+                            </Text>
+                          ) : null}
+                          {item.type === "MANUAL_ADJUSTMENT" && item.note ? (
+                            <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
+                              {t("activityHistory.note")}: {item.note}
+                            </Text>
+                          ) : null}
+                          {item.type === "DAILY_QUESTION_ANSWER" && dailyQuestionResult ? (
+                            <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
+                              {t("activityHistory.dailyResult")}: {dailyQuestionResult}
+                            </Text>
+                          ) : null}
+                          {item.type === "DAILY_QUESTION_ANSWER" ? (
+                            <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
+                              {t("activityHistory.answerType")}: {dailyQuestionAnswerType}
+                            </Text>
+                          ) : null}
+                          {item.type === "TASK_COMPLETION" &&
+                          snapshot.type === "CONDITIONAL" &&
+                          inlineMinorTasks.length > 0 ? (
+                            <Text style={[styles.rowMeta, { color: colors.textSecondary, textAlign }]}>
+                              {t("activityHistory.minorTasks")}: {inlineMinorTasks.join(" | ")}
                             </Text>
                           ) : null}
                         </View>

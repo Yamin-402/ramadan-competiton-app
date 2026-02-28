@@ -9,6 +9,14 @@ function normalize(value) {
   return String(value).trim().toLowerCase();
 }
 
+function unwrapCorrectAnswerValue(value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "value" in value) {
+    return value.value;
+  }
+
+  return value;
+}
+
 function sanitizeQuestionForUser(question) {
   if (!question) {
     return null;
@@ -35,7 +43,8 @@ function parseBoolean(value) {
 }
 
 function evaluateAnswer(question, answer) {
-  if (question.correctAnswer === null || question.correctAnswer === undefined) {
+  const correctAnswer = unwrapCorrectAnswerValue(question.correctAnswer);
+  if (correctAnswer === null || correctAnswer === undefined) {
     return null;
   }
 
@@ -44,12 +53,12 @@ function evaluateAnswer(question, answer) {
   }
 
   if (question.answerType === "SINGLE_CHOICE") {
-    return normalize(answer) === normalize(question.correctAnswer);
+    return normalize(answer) === normalize(correctAnswer);
   }
 
   if (question.answerType === "BOOLEAN") {
     const parsedAnswer = parseBoolean(answer);
-    const parsedCorrect = parseBoolean(question.correctAnswer);
+    const parsedCorrect = parseBoolean(correctAnswer);
 
     if (parsedAnswer === null || parsedCorrect === null) {
       return false;
@@ -59,12 +68,12 @@ function evaluateAnswer(question, answer) {
   }
 
   if (question.answerType === "MULTIPLE_CHOICE") {
-    if (!Array.isArray(answer) || !Array.isArray(question.correctAnswer)) {
+    if (!Array.isArray(answer) || !Array.isArray(correctAnswer)) {
       return false;
     }
 
     const left = normalizeArray(answer);
-    const right = normalizeArray(question.correctAnswer);
+    const right = normalizeArray(correctAnswer);
 
     if (left.length !== right.length) {
       return false;

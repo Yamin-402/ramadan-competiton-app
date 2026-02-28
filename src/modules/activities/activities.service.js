@@ -742,8 +742,14 @@ async function maybeCreateConditionalChildBonusActivities({
       startAt: windowStart,
       endAt: windowEnd,
     });
+    const totalCompletions = await activitiesRepository.countTaskCompletionsForTaskIdsInWindow({
+      userId,
+      taskIds: childConfig.childTaskIds,
+      startAt: windowStart,
+      endAt: windowEnd,
+    });
     const completedTaskIdsSet = new Set(completedTaskIds);
-    const completedCount = completedTaskIdsSet.size;
+    const completedCount = totalCompletions;
 
     const targetPoints = evaluateConditionalTierPoints(
       childConfig.tiers,
@@ -792,6 +798,8 @@ async function maybeCreateConditionalChildBonusActivities({
         kind: "CONDITIONAL_CHILD_BONUS",
         competitionDate: competitionDateString,
         completedCount,
+        completedDistinctCount: completedTaskIdsSet.size,
+        completedTaskIds: Array.from(completedTaskIdsSet),
         targetPoints,
       },
     });
@@ -875,7 +883,16 @@ export const activitiesService = {
       );
       basePoints = Number(inlinePoints.toFixed(2));
 
+      const selectedInlineTasks = inlineConditionalConfig.tasks
+        .filter((item) => selectedKeysSet.has(item.key))
+        .map((item) => ({
+          key: item.key,
+          titleEn: item.titleEn,
+          titleAr: item.titleAr,
+        }));
+
       activityMetadata.selectedInlineTaskKeys = filteredSelectedKeys;
+      activityMetadata.selectedInlineTasks = selectedInlineTasks;
       activityMetadata.inlineSelectedCount = filteredSelectedKeys.length;
     } else {
       basePoints = Number((Number(task.basePoints) * pointUnits).toFixed(2));

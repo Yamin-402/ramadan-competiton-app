@@ -35,6 +35,18 @@ function toStringArray(value: unknown): string[] {
 }
 
 function formatAnswer(answer: unknown): string {
+  if (answer && typeof answer === "object" && !Array.isArray(answer)) {
+    const objectValue = answer as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(objectValue, "value")) {
+      const valuePart = formatAnswer(objectValue.value);
+      const explanationPart =
+        typeof objectValue.explanation === "string" && objectValue.explanation.trim().length > 0
+          ? ` (${objectValue.explanation.trim()})`
+          : "";
+      return `${valuePart}${explanationPart}`;
+    }
+  }
+
   if (answer === null || answer === undefined) {
     return "-";
   }
@@ -52,6 +64,7 @@ export function DailyQuestionsModule() {
   const [singleCorrectIndex, setSingleCorrectIndex] = useState(0);
   const [multipleCorrectIndexes, setMultipleCorrectIndexes] = useState<number[]>([]);
   const [booleanCorrect, setBooleanCorrect] = useState<"true" | "false">("true");
+  const [answerExplanation, setAnswerExplanation] = useState("");
   const [points, setPoints] = useState("0");
   const [activeDate, setActiveDate] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -82,6 +95,7 @@ export function DailyQuestionsModule() {
     setSingleCorrectIndex(0);
     setMultipleCorrectIndexes([]);
     setBooleanCorrect("true");
+    setAnswerExplanation("");
     setPoints("0");
     setActiveDate("");
     setIsActive(true);
@@ -126,11 +140,25 @@ export function DailyQuestionsModule() {
     setActiveDate(toDateKey(question.activeDate));
     setIsActive(question.isActive);
 
+    const correctAnswerObject =
+      question.correctAnswer && typeof question.correctAnswer === "object" && !Array.isArray(question.correctAnswer)
+        ? (question.correctAnswer as Record<string, unknown>)
+        : null;
+    const storedCorrectValue =
+      correctAnswerObject && Object.prototype.hasOwnProperty.call(correctAnswerObject, "value")
+        ? correctAnswerObject.value
+        : question.correctAnswer;
+    const storedExplanation =
+      correctAnswerObject && typeof correctAnswerObject.explanation === "string"
+        ? correctAnswerObject.explanation.trim()
+        : "";
+    setAnswerExplanation(storedExplanation);
+
     if (question.answerType === "TEXT") {
       setTextReferenceAnswer(
-        question.correctAnswer === null || question.correctAnswer === undefined
+        storedCorrectValue === null || storedCorrectValue === undefined
           ? ""
-          : String(question.correctAnswer)
+          : String(storedCorrectValue)
       );
       setChoices(["", ""]);
       setSingleCorrectIndex(0);
@@ -139,7 +167,7 @@ export function DailyQuestionsModule() {
     }
 
     if (question.answerType === "BOOLEAN") {
-      setBooleanCorrect(question.correctAnswer === false ? "false" : "true");
+      setBooleanCorrect(storedCorrectValue === false ? "false" : "true");
       setChoices(["True", "False"]);
       setSingleCorrectIndex(0);
       setMultipleCorrectIndexes([]);
@@ -151,14 +179,14 @@ export function DailyQuestionsModule() {
     setChoices(normalizedOptions);
 
     if (question.answerType === "SINGLE_CHOICE") {
-      const answerValue = String(question.correctAnswer ?? "");
+      const answerValue = String(storedCorrectValue ?? "");
       const selectedIndex = normalizedOptions.findIndex((option) => option === answerValue);
       setSingleCorrectIndex(selectedIndex >= 0 ? selectedIndex : 0);
       setMultipleCorrectIndexes([]);
       return;
     }
 
-    const answerValues = new Set(toStringArray(question.correctAnswer));
+    const answerValues = new Set(toStringArray(storedCorrectValue));
     setMultipleCorrectIndexes(
       normalizedOptions
         .map((option, index) => (answerValues.has(option) ? index : -1))
@@ -214,6 +242,7 @@ export function DailyQuestionsModule() {
         answerType: DailyQuestionType;
         options?: unknown;
         correctAnswer?: unknown;
+        answerExplanation?: string;
         points: number;
         activeDate: string;
         isActive: boolean;
@@ -245,6 +274,10 @@ export function DailyQuestionsModule() {
           }
           payload.correctAnswer = multipleCorrectIndexes.map((index) => cleanedChoices[index]);
         }
+      }
+
+      if (answerExplanation.trim()) {
+        payload.answerExplanation = answerExplanation.trim();
       }
 
       if (editingQuestionId) {
@@ -397,6 +430,16 @@ export function DailyQuestionsModule() {
           <label className="checkbox-label">
             <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
             Active
+          </label>
+
+          <label className="form-grid__full">
+            Answer explanation (shown after reveal)
+            <textarea
+              rows={2}
+              value={answerExplanation}
+              onChange={(event) => setAnswerExplanation(event.target.value)}
+              placeholder="Optional explanation for participants"
+            />
           </label>
 
           {answerType === "TEXT" ? (

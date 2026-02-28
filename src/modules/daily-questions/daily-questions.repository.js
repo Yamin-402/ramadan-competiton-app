@@ -92,6 +92,12 @@ export const dailyQuestionsRepository = {
           questionId: true,
           isCorrect: true,
           awardedPoints: true,
+          question: {
+            select: {
+              questionText: true,
+              answerType: true,
+            },
+          },
         },
       });
 
@@ -122,12 +128,14 @@ export const dailyQuestionsRepository = {
           fastingMultiplier: 1,
           basePoints: answer.awardedPoints,
           effectivePoints: answer.awardedPoints,
-          note: "Daily question revealed",
-          metadata: {
-            questionId: answer.questionId,
-            isCorrect: answer.isCorrect,
-          },
-        })),
+            note: "Daily question revealed",
+            metadata: {
+              questionId: answer.questionId,
+              questionText: answer.question.questionText,
+              answerType: answer.question.answerType,
+              isCorrect: answer.isCorrect,
+            },
+          })),
       });
 
       return { revealedCount: answers.length };

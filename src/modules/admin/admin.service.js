@@ -119,6 +119,14 @@ async function attachCompetitionDateToActivities(rows) {
 
 function parseQuestionChoices(options) {
   if (!Array.isArray(options)) {
+    if (options && typeof options === "object" && !Array.isArray(options)) {
+      const choices = options.choices;
+      if (Array.isArray(choices)) {
+        return choices
+          .map((choice) => String(choice).trim())
+          .filter(Boolean);
+      }
+    }
     return [];
   }
 
@@ -127,7 +135,45 @@ function parseQuestionChoices(options) {
     .filter(Boolean);
 }
 
+function normalizeAnswerExplanation(value) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function packCorrectAnswer(value, explanation) {
+  if (!explanation) {
+    return value;
+  }
+
+  return {
+    value,
+    explanation,
+  };
+}
+
+function unpackCorrectAnswerValue(value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "value" in value) {
+    return value.value;
+  }
+
+  return value;
+}
+
+function unpackCorrectAnswerExplanation(value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "explanation" in value) {
+    const explanation = String(value.explanation || "").trim();
+    return explanation.length > 0 ? explanation : undefined;
+  }
+
+  return undefined;
+}
+
 function normalizeDailyQuestionPayload(payload) {
+  const answerExplanation = normalizeAnswerExplanation(payload.answerExplanation);
   const normalized = {
     questionText: payload.questionText?.trim(),
     answerType: payload.answerType,
@@ -139,10 +185,17 @@ function normalizeDailyQuestionPayload(payload) {
   };
 
   if (payload.answerType === "TEXT") {
+    const textCorrectAnswer =
+      payload.correctAnswer !== undefined && payload.correctAnswer !== null
+        ? String(payload.correctAnswer).trim()
+        : null;
+
+    normalized.correctAnswer = packCorrectAnswer(textCorrectAnswer, answerExplanation);
     if (payload.correctAnswer !== undefined && payload.correctAnswer !== null) {
-      normalized.correctAnswer = String(payload.correctAnswer).trim();
-    } else {
-      normalized.correctAnswer = null;
+      normalized.correctAnswer = packCorrectAnswer(
+        String(payload.correctAnswer).trim(),
+        answerExplanation
+      );
     }
     normalized.options = null;
     return normalized;
@@ -150,9 +203,11 @@ function normalizeDailyQuestionPayload(payload) {
 
   if (payload.answerType === "BOOLEAN") {
     normalized.options = ["True", "False"];
-    if (typeof payload.correctAnswer !== "boolean") {
+    const booleanCorrectAnswer = unpackCorrectAnswerValue(payload.correctAnswer);
+    if (typeof booleanCorrectAnswer !== "boolean") {
       throw new AppError(400, "BOOLEAN question requires boolean correctAnswer");
     }
+    normalized.correctAnswer = packCorrectAnswer(booleanCorrectAnswer, answerExplanation);
     return normalized;
   }
 
@@ -163,19 +218,21 @@ function normalizeDailyQuestionPayload(payload) {
   normalized.options = choices;
 
   if (payload.answerType === "SINGLE_CHOICE") {
-    if (!choices.includes(String(payload.correctAnswer))) {
+    const singleCorrectAnswer = String(unpackCorrectAnswerValue(payload.correctAnswer));
+    if (!choices.includes(singleCorrectAnswer)) {
       throw new AppError(400, "SINGLE_CHOICE correctAnswer must match one option");
     }
-    normalized.correctAnswer = String(payload.correctAnswer);
+    normalized.correctAnswer = packCorrectAnswer(singleCorrectAnswer, answerExplanation);
     return normalized;
   }
 
   if (payload.answerType === "MULTIPLE_CHOICE") {
-    if (!Array.isArray(payload.correctAnswer) || payload.correctAnswer.length === 0) {
+    const multipleCorrectAnswer = unpackCorrectAnswerValue(payload.correctAnswer);
+    if (!Array.isArray(multipleCorrectAnswer) || multipleCorrectAnswer.length === 0) {
       throw new AppError(400, "MULTIPLE_CHOICE requires at least one correct option");
     }
 
-    const correctValues = payload.correctAnswer.map((value) => String(value));
+    const correctValues = multipleCorrectAnswer.map((value) => String(value));
     const unknownValues = correctValues.filter((value) => !choices.includes(value));
     if (unknownValues.length > 0) {
       throw new AppError(400, "MULTIPLE_CHOICE correctAnswer contains unknown options", {
@@ -183,7 +240,10 @@ function normalizeDailyQuestionPayload(payload) {
       });
     }
 
-    normalized.correctAnswer = Array.from(new Set(correctValues));
+    normalized.correctAnswer = packCorrectAnswer(
+      Array.from(new Set(correctValues)),
+      answerExplanation
+    );
     return normalized;
   }
 
@@ -875,6 +935,10 @@ export const adminService = {
       options: payload.options !== undefined ? payload.options : existing.options,
       correctAnswer:
         payload.correctAnswer !== undefined ? payload.correctAnswer : existing.correctAnswer,
+      answerExplanation:
+        payload.answerExplanation !== undefined
+          ? payload.answerExplanation
+          : unpackCorrectAnswerExplanation(existing.correctAnswer),
       points: payload.points ?? Number(existing.points),
       activeDate: payload.activeDate ?? toAppDateString(existing.activeDate),
       isActive: payload.isActive ?? existing.isActive,
@@ -972,6 +1036,8 @@ export const adminService = {
           userId: answer.userId,
           questionId: answer.questionId,
           answerId,
+          questionText: answer.question.questionText,
+          answerType: answer.question.answerType,
           previousAwardedPoints,
           nextAwardedPoints: awardedPoints,
           deltaPoints,

@@ -158,6 +158,14 @@ function getTaskFlowType(item: AdminUserActivity): string {
 }
 
 function resolveEnteredAmount(item: AdminUserActivity): number | null {
+  const snapshot = getTaskSnapshot(item);
+  const flowType = snapshot.flowType;
+  const isAmountTask =
+    flowType === "TIMED" || flowType === "COUNTER" || snapshot.type === "COUNTER";
+  if (!isAmountTask) {
+    return null;
+  }
+
   const metadata = getActivityMetadata(item);
   if (!metadata) {
     return null;
@@ -170,17 +178,13 @@ function resolveEnteredAmount(item: AdminUserActivity): number | null {
 
   const pointUnits = Number(metadata.pointUnits);
   if (Number.isFinite(pointUnits)) {
-    const flowType = getTaskFlowType(item);
     if (flowType === "TIMED") {
       return pointUnits * 60;
     }
 
-    if (item.task?.type === "COUNTER" || flowType === "COUNTER") {
-      return pointUnits;
-    }
+    return pointUnits;
   }
 
-  const snapshot = getTaskSnapshot(item);
   const effectiveBasePoints = Math.abs(toNumber(item.basePoints));
   const taskBasePoints = Math.abs(Number(snapshot.basePoints));
   if (Number.isFinite(taskBasePoints) && taskBasePoints > 0 && Number.isFinite(effectiveBasePoints)) {
@@ -197,8 +201,15 @@ function resolveEnteredAmount(item: AdminUserActivity): number | null {
 }
 
 function formatAmountCell(item: AdminUserActivity): string {
-  const enteredAmount = resolveEnteredAmount(item);
+  const snapshot = getTaskSnapshot(item);
   const flowType = getTaskFlowType(item);
+  const isAmountTask =
+    flowType === "TIMED" || flowType === "COUNTER" || snapshot.type === "COUNTER";
+  if (!isAmountTask) {
+    return "-";
+  }
+
+  const enteredAmount = resolveEnteredAmount(item);
 
   if (enteredAmount !== null && Number.isFinite(enteredAmount)) {
     if (flowType === "TIMED") {
@@ -217,6 +228,95 @@ function formatAmountCell(item: AdminUserActivity): string {
   }
 
   return "-";
+}
+
+function getInlineTaskLabelFromConfig(item: AdminUserActivity, key: string): string | null {
+  const config = item.task?.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return null;
+  }
+
+  const raw = (config as Record<string, unknown>).conditionalInlineTasks;
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+
+  const wanted = String(key || "").trim().toLowerCase();
+  const matched = raw.find((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return false;
+    }
+    const row = entry as Record<string, unknown>;
+    return String(row.key || "").trim().toLowerCase() === wanted;
+  });
+
+  if (!matched || typeof matched !== "object" || Array.isArray(matched)) {
+    return null;
+  }
+
+  const row = matched as Record<string, unknown>;
+  const titleEn = String(row.titleEn || "").trim();
+  const titleAr = String(row.titleAr || "").trim();
+  return titleEn || titleAr || null;
+}
+
+function getDetailsCell(item: AdminUserActivity): string {
+  const metadata = getActivityMetadata(item);
+  if (!metadata) {
+    return item.note || "-";
+  }
+
+  if (item.type === "MANUAL_ADJUSTMENT") {
+    return item.note || "Manual admin adjustment";
+  }
+
+  if (item.type === "DAILY_QUESTION_ANSWER") {
+    const answerType =
+      typeof metadata.answerType === "string" && metadata.answerType.trim().length > 0
+        ? metadata.answerType
+        : "Unknown";
+    const correctness =
+      metadata.isCorrect === true
+        ? "Correct"
+        : metadata.isCorrect === false
+          ? "Wrong"
+          : "Pending";
+
+    const label = `Daily question (${answerType}) - ${correctness}`;
+    return item.note ? `${label} | Note: ${item.note}` : label;
+  }
+
+  if (item.type === "TASK_COMPLETION" && getTaskSnapshot(item).type === "CONDITIONAL") {
+    const rawInlineTasks = metadata.selectedInlineTasks;
+    if (Array.isArray(rawInlineTasks)) {
+      const labels = rawInlineTasks
+        .map((row) => {
+          if (!row || typeof row !== "object" || Array.isArray(row)) {
+            return null;
+          }
+
+          const value = row as Record<string, unknown>;
+          const label = String(value.titleEn || value.titleAr || value.key || "").trim();
+          return label || null;
+        })
+        .filter((label): label is string => Boolean(label));
+
+      if (labels.length > 0) {
+        return `Minor tasks: ${labels.join(" | ")}`;
+      }
+    }
+
+    const rawKeys = metadata.selectedInlineTaskKeys;
+    if (Array.isArray(rawKeys) && rawKeys.length > 0) {
+      const labels = rawKeys
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .map((key) => getInlineTaskLabelFromConfig(item, key) || key.replace(/[_-]+/g, " ").trim() || key);
+      return `Minor tasks: ${labels.join(" | ")}`;
+    }
+  }
+
+  return item.note || "-";
 }
 
 export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryModuleProps) {
@@ -432,6 +532,7 @@ export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryM
                             <th>Type</th>
                             <th>Fasting status</th>
                             <th>Amount</th>
+                            <th>Details</th>
                             <th>Points</th>
                           </tr>
                         </thead>
@@ -451,6 +552,7 @@ export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryM
                               <td>
                                 {formatAmountCell(item)}
                               </td>
+                              <td>{getDetailsCell(item)}</td>
                               <td>{formatSignedPoints(item.effectivePoints)}</td>
                             </tr>
                           ))}

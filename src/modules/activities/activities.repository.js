@@ -142,6 +142,20 @@ export const activitiesRepository = {
       .filter((taskId) => typeof taskId === "number");
   },
 
+  countTaskCompletionsForTaskIdsInWindow({ userId, taskIds, startAt, endAt }) {
+    return prisma.activity.count({
+      where: {
+        userId,
+        type: "TASK_COMPLETION",
+        taskId: { in: taskIds },
+        occurredAt: {
+          gte: startAt,
+          lt: endAt,
+        },
+      },
+    });
+  },
+
   findSystemActivityByNote({ userId, taskId, note }) {
     return prisma.activity.findFirst({
       where: {
@@ -167,11 +181,11 @@ export const activitiesRepository = {
         },
       },
       _sum: {
-        effectivePoints: true,
+        basePoints: true,
       },
     });
 
-    return Number(result._sum.effectivePoints || 0);
+    return Number(result._sum.basePoints || 0);
   },
 
   createSystemActivity(payload) {
