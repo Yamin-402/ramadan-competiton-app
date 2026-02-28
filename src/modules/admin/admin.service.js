@@ -117,6 +117,73 @@ async function attachCompetitionDateToActivities(rows) {
   );
 }
 
+function parseActivityMetadataObject(row) {
+  if (!row?.metadata || typeof row.metadata !== "object" || Array.isArray(row.metadata)) {
+    return null;
+  }
+
+  return row.metadata;
+}
+
+function parseDailyQuestionId(metadata) {
+  const questionId = Number(metadata?.questionId);
+  if (!Number.isInteger(questionId) || questionId <= 0) {
+    return null;
+  }
+  return questionId;
+}
+
+async function enrichDailyQuestionAnswerType(rows) {
+  const questionIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.type === "DAILY_QUESTION_ANSWER")
+        .map((row) => parseActivityMetadataObject(row))
+        .filter((metadata) => metadata && !metadata.answerType)
+        .map((metadata) => parseDailyQuestionId(metadata))
+        .filter((id) => id !== null)
+    )
+  );
+
+  if (questionIds.length === 0) {
+    return rows;
+  }
+
+  const questions = await adminRepository.findDailyQuestionsByIds(questionIds);
+  const answerTypeByQuestionId = new Map(
+    questions.map((question) => [question.id, question.answerType])
+  );
+
+  return rows.map((row) => {
+    if (row.type !== "DAILY_QUESTION_ANSWER") {
+      return row;
+    }
+
+    const metadata = parseActivityMetadataObject(row);
+    if (!metadata || metadata.answerType) {
+      return row;
+    }
+
+    const questionId = parseDailyQuestionId(metadata);
+    if (!questionId) {
+      return row;
+    }
+
+    const answerType = answerTypeByQuestionId.get(questionId);
+    if (!answerType) {
+      return row;
+    }
+
+    return {
+      ...row,
+      metadata: {
+        ...metadata,
+        answerType,
+      },
+    };
+  });
+}
+
 function parseQuestionChoices(options) {
   if (!Array.isArray(options)) {
     if (options && typeof options === "object" && !Array.isArray(options)) {
@@ -761,7 +828,8 @@ export const adminService = {
     }
 
     const rows = await adminRepository.listUserActivitiesForAdmin(userId, query.limit);
-    return attachCompetitionDateToActivities(rows);
+    const enrichedRows = await enrichDailyQuestionAnswerType(rows);
+    return attachCompetitionDateToActivities(enrichedRows);
   },
 
   async createManualAdjustment(auth, payload) {

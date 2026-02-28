@@ -417,6 +417,75 @@ async function attachCompetitionDate(rows) {
   );
 }
 
+function parseMetadataObject(row) {
+  if (!row?.metadata || typeof row.metadata !== "object" || Array.isArray(row.metadata)) {
+    return null;
+  }
+
+  return row.metadata;
+}
+
+function parseQuestionIdFromMetadata(metadata) {
+  const questionIdRaw = metadata?.questionId;
+  const questionId = Number(questionIdRaw);
+  if (!Number.isInteger(questionId) || questionId <= 0) {
+    return null;
+  }
+
+  return questionId;
+}
+
+async function enrichDailyQuestionAnswerType(rows) {
+  const missingQuestionIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.type === "DAILY_QUESTION_ANSWER")
+        .map((row) => parseMetadataObject(row))
+        .filter((metadata) => metadata && !metadata.answerType)
+        .map((metadata) => parseQuestionIdFromMetadata(metadata))
+        .filter((value) => value !== null)
+    )
+  );
+
+  if (missingQuestionIds.length === 0) {
+    return rows;
+  }
+
+  const questionRows = await activitiesRepository.findDailyQuestionsByIds(missingQuestionIds);
+  const answerTypeByQuestionId = new Map(
+    questionRows.map((questionRow) => [questionRow.id, questionRow.answerType])
+  );
+
+  return rows.map((row) => {
+    if (row.type !== "DAILY_QUESTION_ANSWER") {
+      return row;
+    }
+
+    const metadata = parseMetadataObject(row);
+    if (!metadata || metadata.answerType) {
+      return row;
+    }
+
+    const questionId = parseQuestionIdFromMetadata(metadata);
+    if (!questionId) {
+      return row;
+    }
+
+    const answerType = answerTypeByQuestionId.get(questionId);
+    if (!answerType) {
+      return row;
+    }
+
+    return {
+      ...row,
+      metadata: {
+        ...metadata,
+        answerType,
+      },
+    };
+  });
+}
+
 async function assertNotAlreadyCompletedInCompetitionDay(task, userId, occurredAt) {
   const completionLimit = resolveCompletionLimit(task);
   if (!Number.isFinite(completionLimit)) {
@@ -962,7 +1031,8 @@ export const activitiesService = {
   async listMyActivities(auth, query) {
     const userId = getAuthUserId(auth);
     const rows = await activitiesRepository.listUserActivities(userId, query.limit);
-    return attachCompetitionDate(rows);
+    const enrichedRows = await enrichDailyQuestionAnswerType(rows);
+    return attachCompetitionDate(enrichedRows);
   },
 
   async getFastingStatus(_auth, query) {

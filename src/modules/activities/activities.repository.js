@@ -324,4 +324,18 @@ export const activitiesRepository = {
       },
     });
   },
+
+  findDailyQuestionsByIds(questionIds) {
+    return prisma.dailyQuestion.findMany({
+      where: {
+        id: {
+          in: questionIds,
+        },
+      },
+      select: {
+        id: true,
+        answerType: true,
+      },
+    });
+  },
 };

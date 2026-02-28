@@ -786,6 +786,20 @@ export const adminRepository = {
     });
   },
 
+  findDailyQuestionsByIds(questionIds) {
+    return prisma.dailyQuestion.findMany({
+      where: {
+        id: {
+          in: questionIds,
+        },
+      },
+      select: {
+        id: true,
+        answerType: true,
+      },
+    });
+  },
+
   findDailyQuestionAnswerById(answerId) {
     return prisma.dailyQuestionAnswer.findUnique({
       where: { id: answerId },
