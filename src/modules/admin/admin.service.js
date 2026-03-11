@@ -3,9 +3,16 @@ import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
 import { getOrCreateFastingWindow } from "../../integrations/prayer-times/prayer-time.service.js";
+import { fetchIslamicDailyQuestionSuggestions } from "../../integrations/daily-question-suggestions/islamic-questions.client.js";
 import { normalizeAdminPermissions } from "../../core/auth/admin-permissions.js";
 import bcrypt from "bcrypt";
 import { adminRepository } from "./admin.repository.js";
+
+const SCORING_MULTIPLIER_SETTING_KEY = "SCORING_MULTIPLIER";
+const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
+  multiplierValue: 1.5,
+  applyDuring: "IFTAR",
+};
 
 function normalizeUniqueKeys(values) {
   return Array.from(
@@ -239,6 +246,72 @@ function unpackCorrectAnswerExplanation(value) {
   return undefined;
 }
 
+function getCorrectAnswerValue(value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "value" in value) {
+    return value.value;
+  }
+
+  return value;
+}
+
+function normalizeText(value) {
+  return String(value).trim().toLowerCase();
+}
+
+function normalizeTextArray(values) {
+  return Array.from(new Set(values.map((value) => normalizeText(value)))).sort();
+}
+
+function parseBoolean(value) {
+  if (value === true || value === "true" || value === 1 || value === "1") {
+    return true;
+  }
+
+  if (value === false || value === "false" || value === 0 || value === "0") {
+    return false;
+  }
+
+  return null;
+}
+
+function evaluateDailyQuestionAnswer(question, answer) {
+  const correctAnswer = getCorrectAnswerValue(question.correctAnswer);
+  if (correctAnswer === null || correctAnswer === undefined) {
+    return null;
+  }
+
+  if (question.answerType === "TEXT") {
+    return null;
+  }
+
+  if (question.answerType === "SINGLE_CHOICE") {
+    return normalizeText(answer) === normalizeText(correctAnswer);
+  }
+
+  if (question.answerType === "BOOLEAN") {
+    const parsedAnswer = parseBoolean(answer);
+    const parsedCorrect = parseBoolean(correctAnswer);
+    if (parsedAnswer === null || parsedCorrect === null) {
+      return false;
+    }
+    return parsedAnswer === parsedCorrect;
+  }
+
+  if (question.answerType === "MULTIPLE_CHOICE") {
+    if (!Array.isArray(answer) || !Array.isArray(correctAnswer)) {
+      return false;
+    }
+    const left = normalizeTextArray(answer);
+    const right = normalizeTextArray(correctAnswer);
+    if (left.length !== right.length) {
+      return false;
+    }
+    return left.every((value, index) => value === right[index]);
+  }
+
+  return false;
+}
+
 function normalizeDailyQuestionPayload(payload) {
   const answerExplanation = normalizeAnswerExplanation(payload.answerExplanation);
   const normalized = {
@@ -315,6 +388,30 @@ function normalizeDailyQuestionPayload(payload) {
   }
 
   return normalized;
+}
+
+function normalizeScoringSettingsValue(value) {
+  const settingValue =
+    value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  const rawMultiplier = Number(settingValue?.value ?? settingValue?.multiplierValue);
+  const multiplierValue =
+    Number.isFinite(rawMultiplier) && rawMultiplier >= 1
+      ? Number(rawMultiplier.toFixed(2))
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.multiplierValue;
+
+  const rawApplyDuring =
+    typeof settingValue?.applyDuring === "string"
+      ? settingValue.applyDuring.trim().toUpperCase()
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+  const applyDuring =
+    rawApplyDuring === "FASTING" || rawApplyDuring === "IFTAR"
+      ? rawApplyDuring
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+
+  return {
+    multiplierValue,
+    applyDuring,
+  };
 }
 
 export const adminService = {
@@ -903,6 +1000,7 @@ export const adminService = {
         filters: {
           tagIds,
           userIds,
+          isAnnouncement: Boolean(payload.isAnnouncement),
         },
         targetTagIds: tagIds,
       },
@@ -985,6 +1083,16 @@ export const adminService = {
     return adminRepository.listDailyQuestions(query.limit);
   },
 
+  async listDailyQuestionSuggestions(_auth, query) {
+    try {
+      return await fetchIslamicDailyQuestionSuggestions(query.answerType, query.limit);
+    } catch (error) {
+      throw new AppError(502, "Could not fetch Islamic question suggestions", {
+        cause: error?.message || "unknown_error",
+      });
+    }
+  },
+
   async updateDailyQuestion(auth, questionId, payload) {
     const adminId = getAuthUserId(auth);
     const existing = await adminRepository.findDailyQuestionById(questionId);
@@ -1029,6 +1137,52 @@ export const adminService = {
         throw new AppError(409, "A daily question already exists for this day");
       }
       throw error;
+    }
+
+    const shouldRecalculateAnswers =
+      normalized.answerType !== "TEXT" &&
+      (payload.correctAnswer !== undefined ||
+        payload.options !== undefined ||
+        payload.answerType !== undefined ||
+        payload.points !== undefined);
+
+    if (shouldRecalculateAnswers) {
+      const answers = await adminRepository.listDailyQuestionAnswersForRecalculation(questionId);
+      const updates = answers
+        .map((answer) => {
+          const nextIsCorrect = evaluateDailyQuestionAnswer(updated, answer.answer);
+          const nextAwardedPoints = nextIsCorrect === true ? Number(updated.points) : 0;
+          const previousAwardedPoints = Number(answer.awardedPoints);
+          const previousIsCorrect = answer.isCorrect;
+
+          const isChanged =
+            previousIsCorrect !== nextIsCorrect ||
+            Number(previousAwardedPoints.toFixed(2)) !== Number(nextAwardedPoints.toFixed(2));
+
+          if (!isChanged) {
+            return null;
+          }
+
+          return {
+            answerId: answer.id,
+            userId: answer.userId,
+            isRevealed: answer.isRevealed,
+            previousAwardedPoints,
+            nextAwardedPoints,
+            nextIsCorrect,
+          };
+        })
+        .filter(Boolean);
+
+      if (updates.length > 0) {
+        await adminRepository.recalculateDailyQuestionAnswers(
+          questionId,
+          updated.questionText,
+          updated.answerType,
+          updates,
+          env.appTimezone
+        );
+      }
     }
 
     await adminRepository.createAdminActionLog({
@@ -1180,5 +1334,34 @@ export const adminService = {
 
   async listNotificationCampaigns(_auth, query) {
     return adminRepository.listNotificationCampaigns(query.limit);
+  },
+
+  async getScoringSettings(_auth) {
+    const row = await adminRepository.getAppSetting(SCORING_MULTIPLIER_SETTING_KEY);
+    return normalizeScoringSettingsValue(row?.value);
+  },
+
+  async updateScoringSettings(auth, payload) {
+    const adminId = getAuthUserId(auth);
+    const value = {
+      value: Number(payload.multiplierValue.toFixed(2)),
+      applyDuring: payload.applyDuring,
+    };
+
+    const updated = await adminRepository.upsertAppSetting(
+      SCORING_MULTIPLIER_SETTING_KEY,
+      value
+    );
+
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "UPDATE_SCORING_SETTINGS",
+      entityType: "APP_SETTING",
+      entityId: SCORING_MULTIPLIER_SETTING_KEY,
+      summary: `Updated scoring multiplier to ${value.value} on ${value.applyDuring}`,
+      payload: value,
+    });
+
+    return normalizeScoringSettingsValue(updated?.value);
   },
 };

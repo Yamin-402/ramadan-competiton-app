@@ -45,8 +45,13 @@ export const dailyQuestionsRepository = {
     });
   },
 
-  listUserHistory(userId, limit) {
+  listUserHistory(userId, limit, competitionDate) {
     return prisma.dailyQuestion.findMany({
+      where: {
+        activeDate: {
+          lte: competitionDate,
+        },
+      },
       orderBy: [{ activeDate: "desc" }, { id: "desc" }],
       take: limit,
       select: {

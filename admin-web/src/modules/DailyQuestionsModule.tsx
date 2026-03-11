@@ -2,7 +2,12 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { adminApi } from "../api/admin-api";
 import { toApiErrorMessage } from "../api/http";
 import { PanelCard } from "../components/PanelCard";
-import { AdminDailyQuestionAnswer, DailyQuestionListItem, DailyQuestionType } from "../types";
+import {
+  AdminDailyQuestionAnswer,
+  DailyQuestionListItem,
+  DailyQuestionSuggestion,
+  DailyQuestionType,
+} from "../types";
 
 const answerTypes: DailyQuestionType[] = ["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"];
 
@@ -56,6 +61,23 @@ function formatAnswer(answer: unknown): string {
   return JSON.stringify(answer);
 }
 
+function formatSuggestionAnswerPreview(suggestion: DailyQuestionSuggestion): string {
+  if (suggestion.answerType === "BOOLEAN") {
+    return suggestion.correctAnswer === true ? "نعم" : "لا";
+  }
+
+  if (suggestion.answerType === "MULTIPLE_CHOICE") {
+    const values = toStringArray(suggestion.correctAnswer);
+    return values.join(" | ") || "-";
+  }
+
+  if (suggestion.correctAnswer === null || suggestion.correctAnswer === undefined) {
+    return "-";
+  }
+
+  return String(suggestion.correctAnswer);
+}
+
 export function DailyQuestionsModule() {
   const [questionText, setQuestionText] = useState("");
   const [answerType, setAnswerType] = useState<DailyQuestionType>("TEXT");
@@ -75,6 +97,8 @@ export function DailyQuestionsModule() {
   const [submitting, setSubmitting] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [deletingQuestionId, setDeletingQuestionId] = useState<number | null>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<DailyQuestionSuggestion[]>([]);
 
   const [selectedQuestion, setSelectedQuestion] = useState<DailyQuestionListItem | null>(null);
   const [answerRows, setAnswerRows] = useState<AdminDailyQuestionAnswer[]>([]);
@@ -297,6 +321,85 @@ export function DailyQuestionsModule() {
     }
   };
 
+  const loadSuggestions = async () => {
+    setError(null);
+    setSuccess(null);
+    setLoadingSuggestions(true);
+    try {
+      const data = await adminApi.listDailyQuestionSuggestions({
+        answerType,
+        limit: 6,
+      });
+      setSuggestions(data);
+      if (data.length === 0) {
+        setSuccess("No Arabic Islamic suggestions right now. Try again.");
+      } else {
+        setSuccess(`Loaded ${data.length} suggestion(s).`);
+      }
+    } catch (err) {
+      setError(toApiErrorMessage(err, "Could not load suggestions"));
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: DailyQuestionSuggestion) => {
+    setError(null);
+    setSuccess("Suggestion loaded into form. You can edit it before saving.");
+    setQuestionText(String(suggestion.questionText || ""));
+    setAnswerType(suggestion.answerType);
+    setAnswerExplanation(
+      typeof suggestion.answerExplanation === "string" ? suggestion.answerExplanation : ""
+    );
+
+    if (suggestion.answerType === "TEXT") {
+      setTextReferenceAnswer(
+        suggestion.correctAnswer === null || suggestion.correctAnswer === undefined
+          ? ""
+          : String(suggestion.correctAnswer)
+      );
+      setChoices(["", ""]);
+      setSingleCorrectIndex(0);
+      setMultipleCorrectIndexes([]);
+      setBooleanCorrect("true");
+      return;
+    }
+
+    if (suggestion.answerType === "BOOLEAN") {
+      setBooleanCorrect(suggestion.correctAnswer === false ? "false" : "true");
+      setTextReferenceAnswer("");
+      setChoices(["True", "False"]);
+      setSingleCorrectIndex(0);
+      setMultipleCorrectIndexes([]);
+      return;
+    }
+
+    const normalizedChoices = toStringArray(suggestion.options);
+    const nextChoices = normalizedChoices.length >= 2 ? normalizedChoices : ["", ""];
+    setChoices(nextChoices);
+    setTextReferenceAnswer("");
+    setBooleanCorrect("true");
+
+    if (suggestion.answerType === "SINGLE_CHOICE") {
+      const correctValue =
+        suggestion.correctAnswer === null || suggestion.correctAnswer === undefined
+          ? ""
+          : String(suggestion.correctAnswer);
+      const selectedIndex = nextChoices.findIndex((choice) => choice === correctValue);
+      setSingleCorrectIndex(selectedIndex >= 0 ? selectedIndex : 0);
+      setMultipleCorrectIndexes([]);
+      return;
+    }
+
+    const correctValues = new Set(toStringArray(suggestion.correctAnswer));
+    setMultipleCorrectIndexes(
+      nextChoices
+        .map((choice, index) => (correctValues.has(choice) ? index : -1))
+        .filter((index) => index >= 0)
+    );
+    setSingleCorrectIndex(0);
+  };
+
   const deleteQuestion = async (question: DailyQuestionListItem) => {
     if (!window.confirm(`Delete question #${question.id}?`)) {
       return;
@@ -404,6 +507,45 @@ export function DailyQuestionsModule() {
               ))}
             </select>
           </label>
+
+          <div className="form-grid__full">
+            <div className="inline-form">
+              <button type="button" onClick={() => void loadSuggestions()} disabled={loadingSuggestions}>
+                {loadingSuggestions ? "Loading suggestions..." : "Suggest from Islamic API"}
+              </button>
+              <small className="muted-text">
+                Arabic suggestions for selected answer type ({answerType})
+              </small>
+            </div>
+            {suggestions.length > 0 ? (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Correct</th>
+                      <th>Source</th>
+                      <th>Apply</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suggestions.map((suggestion, index) => (
+                      <tr key={`${suggestion.source}-${index}`}>
+                        <td>{suggestion.questionText}</td>
+                        <td>{formatSuggestionAnswerPreview(suggestion)}</td>
+                        <td>{suggestion.source}</td>
+                        <td>
+                          <button type="button" onClick={() => applySuggestion(suggestion)}>
+                            Use
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
 
           <label>
             Active date

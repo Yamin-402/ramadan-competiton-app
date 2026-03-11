@@ -20,6 +20,7 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [targetType, setTargetType] = useState<NotificationTargetType>("ALL_USERS");
+  const [isAnnouncement, setIsAnnouncement] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [campaigns, setCampaigns] = useState<NotificationCampaignListItem[]>([]);
@@ -76,6 +77,7 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
         title: title.trim(),
         body: body.trim(),
         targetType,
+        isAnnouncement,
         filters: {
           tagIds: selectedTagIds,
           userIds: selectedUserIds,
@@ -85,6 +87,7 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
       setTitle("");
       setBody("");
       setTargetType("ALL_USERS");
+      setIsAnnouncement(false);
       setSelectedTagIds([]);
       setSelectedUserIds([]);
       setSuccess("Campaign created.");
@@ -118,6 +121,15 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
           <label className="form-grid__full">
             Body
             <textarea rows={3} value={body} onChange={(event) => setBody(event.target.value)} required />
+          </label>
+
+          <label className="checkbox-label form-grid__full">
+            <input
+              type="checkbox"
+              checked={isAnnouncement}
+              onChange={(event) => setIsAnnouncement(event.target.checked)}
+            />
+            Show as app popup announcement
           </label>
 
           {targetType === "TAGS" ? (
@@ -181,6 +193,7 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
                 <th>ID</th>
                 <th>Title</th>
                 <th>Target</th>
+                <th>Announcement</th>
                 <th>Pending</th>
                 <th>Sent</th>
                 <th>Failed</th>
@@ -194,6 +207,7 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
                   <td>{item.campaign.id}</td>
                   <td>{item.campaign.title}</td>
                   <td>{item.campaign.targetType}</td>
+                  <td>{item.campaign.filters?.isAnnouncement ? "Yes" : "No"}</td>
                   <td>{item.stats.pending}</td>
                   <td>{item.stats.sent}</td>
                   <td>{item.stats.failed}</td>

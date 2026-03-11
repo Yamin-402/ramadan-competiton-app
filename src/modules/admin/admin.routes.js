@@ -17,9 +17,11 @@ import {
   deleteTask,
   deleteTaskCounterRule,
   getLeaderboard,
+  getScoringSettings,
   listCounters,
   listDailyQuestionAnswers,
   listDailyQuestions,
+  listDailyQuestionSuggestions,
   listNotificationCampaigns,
   listPermissionKeys,
   listTasks,
@@ -34,6 +36,7 @@ import {
   updateAdminAccess,
   updateDailyQuestion,
   updateTask,
+  updateScoringSettings,
 } from "./admin.controller.js";
 
 const router = Router();
@@ -80,6 +83,11 @@ router.delete(
 );
 router.post("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(createDailyQuestion));
 router.get("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(listDailyQuestions));
+router.get(
+  "/daily-questions/suggestions",
+  requireAdminPermission("DAILY_QUESTIONS"),
+  asyncHandler(listDailyQuestionSuggestions)
+);
 router.post("/daily-questions/reveal", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(revealDailyQuestionAnswers));
 router.patch("/daily-questions/:id", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(updateDailyQuestion));
 router.delete("/daily-questions/:id", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(deleteDailyQuestion));
@@ -90,5 +98,7 @@ router.patch(
   asyncHandler(reviewDailyQuestionAnswer)
 );
 router.get("/leaderboard", requireAdminPermission("LEADERBOARD"), asyncHandler(getLeaderboard));
+router.get("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(getScoringSettings));
+router.patch("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(updateScoringSettings));
 
 export default router;

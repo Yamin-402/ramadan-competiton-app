@@ -16,6 +16,7 @@ import {
   listAdminUsersQuerySchema,
   listDailyQuestionAnswersQuerySchema,
   listDailyQuestionsQuerySchema,
+  listDailyQuestionSuggestionsQuerySchema,
   listNotificationCampaignsQuerySchema,
   listTaskCounterRulesQuerySchema,
   notificationCampaignParamsSchema,
@@ -23,6 +24,7 @@ import {
   taskParamsSchema,
   taskCounterRuleParamsSchema,
   updateAdminAccessSchema,
+  updateScoringSettingsSchema,
   updateDailyQuestionSchema,
   userParamsSchema,
   updateTaskSchema,
@@ -173,6 +175,13 @@ export async function listDailyQuestions(req, res) {
   res.status(200).json({ data });
 }
 
+export async function listDailyQuestionSuggestions(req, res) {
+  const query = listDailyQuestionSuggestionsQuerySchema.parse(req.query);
+  const data = await adminService.listDailyQuestionSuggestions(req.auth, query);
+
+  res.status(200).json({ data });
+}
+
 export async function updateDailyQuestion(req, res) {
   const { id } = dailyQuestionParamsSchema.parse(req.params);
   const payload = updateDailyQuestionSchema.parse(req.body);
@@ -232,6 +241,19 @@ export async function updateAdminAccess(req, res) {
   const { id } = userParamsSchema.parse(req.params);
   const payload = updateAdminAccessSchema.parse(req.body);
   const data = await adminService.updateAdminAccess(req.auth, id, payload);
+
+  res.status(200).json({ data });
+}
+
+export async function getScoringSettings(req, res) {
+  const data = await adminService.getScoringSettings(req.auth);
+
+  res.status(200).json({ data });
+}
+
+export async function updateScoringSettings(req, res) {
+  const payload = updateScoringSettingsSchema.parse(req.body);
+  const data = await adminService.updateScoringSettings(req.auth, payload);
 
   res.status(200).json({ data });
 }

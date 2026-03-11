@@ -320,6 +320,7 @@ function getDetailsCell(item: AdminUserActivity): string {
 }
 
 export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryModuleProps) {
+  const initialPointsBaseline = 100;
   const [selectedUserId, setSelectedUserId] = useState<string>(initialUserId ? String(initialUserId) : "");
   const [rows, setRows] = useState<AdminUserActivity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -403,16 +404,16 @@ export function UserTaskHistoryModule({ users, initialUserId }: UserTaskHistoryM
   }, [rows]);
 
   const overallPoints = useMemo(
-    () => rows.reduce((sum, row) => sum + toNumber(row.effectivePoints), 0),
-    [rows]
+    () => initialPointsBaseline + rows.reduce((sum, row) => sum + toNumber(row.effectivePoints), 0),
+    [initialPointsBaseline, rows]
   );
   const pointsGained = useMemo(
     () =>
       rows
         .map((row) => toNumber(row.effectivePoints))
         .filter((value) => value > 0)
-        .reduce((sum, value) => sum + value, 0),
-    [rows]
+        .reduce((sum, value) => sum + value, initialPointsBaseline),
+    [initialPointsBaseline, rows]
   );
   const pointsLost = useMemo(
     () =>

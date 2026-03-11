@@ -120,6 +120,7 @@ export interface NotificationCampaignListItem {
     filters: {
       tagIds: number[];
       userIds: number[];
+      isAnnouncement?: boolean;
     };
     targetTags: Array<{
       tag: {
@@ -141,6 +142,11 @@ export interface NotificationCampaignListItem {
   };
 }
 
+export interface ScoringSettings {
+  multiplierValue: number;
+  applyDuring: "FASTING" | "IFTAR";
+}
+
 export interface DailyQuestionListItem {
   id: number;
   questionText: string;
@@ -154,6 +160,15 @@ export interface DailyQuestionListItem {
   _count: {
     answers: number;
   };
+}
+
+export interface DailyQuestionSuggestion {
+  source: string;
+  questionText: string;
+  answerType: DailyQuestionType;
+  options: unknown;
+  correctAnswer: unknown;
+  answerExplanation?: string | null;
 }
 
 export interface LeaderboardRow {

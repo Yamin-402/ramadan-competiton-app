@@ -55,6 +55,29 @@ const taskListSelect = {
 };
 
 export const adminRepository = {
+  getAppSetting(key) {
+    return prisma.appSetting.findUnique({
+      where: { key },
+      select: {
+        key: true,
+        value: true,
+      },
+    });
+  },
+
+  upsertAppSetting(key, value) {
+    return prisma.appSetting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+      select: {
+        key: true,
+        value: true,
+        updatedAt: true,
+      },
+    });
+  },
+
   listCounters(query) {
     return prisma.counterDefinition.findMany({
       where: query.includeInactive ? {} : { isActive: true },
@@ -598,6 +621,13 @@ export const adminRepository = {
             tag: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+          },
+        },
       },
     });
   },
@@ -783,6 +813,88 @@ export const adminRepository = {
           },
         },
       },
+    });
+  },
+
+  listDailyQuestionAnswersForRecalculation(questionId) {
+    return prisma.dailyQuestionAnswer.findMany({
+      where: { questionId },
+      select: {
+        id: true,
+        userId: true,
+        questionId: true,
+        answer: true,
+        isCorrect: true,
+        awardedPoints: true,
+        isRevealed: true,
+      },
+    });
+  },
+
+  async recalculateDailyQuestionAnswers(
+    questionId,
+    questionText,
+    answerType,
+    updates,
+    timezone
+  ) {
+    if (updates.length === 0) {
+      return { updatedCount: 0, adjustedActivitiesCount: 0 };
+    }
+
+    return prisma.$transaction(async (tx) => {
+      for (const update of updates) {
+        await tx.dailyQuestionAnswer.update({
+          where: { id: update.answerId },
+          data: {
+            isCorrect: update.nextIsCorrect,
+            awardedPoints: update.nextAwardedPoints,
+          },
+        });
+      }
+
+      const activityData = updates
+        .map((update) => {
+          const deltaPoints = Number(
+            (update.nextAwardedPoints - update.previousAwardedPoints).toFixed(2)
+          );
+          if (!update.isRevealed || deltaPoints === 0) {
+            return null;
+          }
+
+          return {
+            userId: update.userId,
+            type: "DAILY_QUESTION_ANSWER",
+            occurredAt: new Date(),
+            timezone,
+            isDuringFasting: false,
+            fastingMultiplier: 1,
+            basePoints: deltaPoints,
+            effectivePoints: deltaPoints,
+            note: "Daily question answer recalculated",
+            metadata: {
+              questionId,
+              questionText,
+              answerType,
+              previousAwardedPoints: update.previousAwardedPoints,
+              nextAwardedPoints: update.nextAwardedPoints,
+              isCorrect: update.nextIsCorrect,
+              isQuestionUpdateAdjustment: true,
+            },
+          };
+        })
+        .filter(Boolean);
+
+      if (activityData.length > 0) {
+        await tx.activity.createMany({
+          data: activityData,
+        });
+      }
+
+      return {
+        updatedCount: updates.length,
+        adjustedActivitiesCount: activityData.length,
+      };
     });
   },
 

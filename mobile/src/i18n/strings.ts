@@ -25,6 +25,8 @@ const en = {
   "common.loadMore": "Load more",
   "common.unread": "Unread",
   "common.read": "Read",
+  "announcement.title": "New announcement",
+  "announcement.dismiss": "Got it",
 
   "more.title": "More",
   "more.welcome": "Assalamu Alaikum",
@@ -84,7 +86,7 @@ const en = {
   "tasks.loggedPoints": "Task saved. {{points}} points",
   "tasks.autoReward": "Auto reward",
   "tasks.alreadyLoggedToday": "You already logged this task today.",
-  "tasks.fastingBoost": "x1.5 in fasting",
+  "tasks.fastingBoost": "x1.5 timing bonus",
   "tasks.rules": "rules",
   "tasks.conditions": "Conditions",
   "tasks.deps": "Deps",
@@ -271,6 +273,7 @@ const en = {
   "profile.noBio": "No bio added yet.",
   "profile.privateStreak": "This user keeps streak visibility private.",
   "profile.unavailable": "User profile unavailable.",
+  "profile.downloadPhoto": "Download photo",
   "profile.replayGuide": "Replay app guide",
 
   "guide.kicker": "Quick guide",
@@ -278,7 +281,7 @@ const en = {
   "guide.slide1Body": "You start with 100 points. Every task updates your score, streak, and history.",
   "guide.slide2Title": "Tasks and points",
   "guide.slide2Body":
-    "Normal, counter, timed, and conditional tasks are dynamic. Log with Fasting/Iftar timing. During fasting, points are multiplied by x1.5.",
+    "Normal, counter, timed, and conditional tasks are dynamic. Log with Fasting/Iftar timing. The x1.5 multiplier is applied based on the admin timing setting.",
   "guide.slide3Title": "Forbidden tasks are private",
   "guide.slide3Body":
     "Forbidden logs reduce your points and are visible only to you. Admin can see score changes, not forbidden details.",
@@ -382,6 +385,8 @@ const ar: Record<keyof typeof en, string> = {
   "common.loadMore": "عرض المزيد",
   "common.unread": "غير مقروء",
   "common.read": "مقروء",
+  "announcement.title": "إعلان جديد",
+  "announcement.dismiss": "تمام",
 
   "more.title": "المزيد",
   "more.welcome": "السلام عليكم",
@@ -440,7 +445,7 @@ const ar: Record<keyof typeof en, string> = {
   "tasks.loggedPoints": "تم تسجيل المهمة. {{points}} نقطة",
   "tasks.autoReward": "مكافأة تلقائية",
   "tasks.alreadyLoggedToday": "لقد سجلت هذه المهمة اليوم.",
-  "tasks.fastingBoost": "مضاعف 1.5 في وقت الصيام",
+  "tasks.fastingBoost": "مضاعف 1.5 حسب توقيت الإعداد",
   "tasks.rules": "قواعد",
   "tasks.conditions": "شروط",
   "tasks.deps": "اعتمادات",
@@ -627,6 +632,7 @@ const ar: Record<keyof typeof en, string> = {
   "profile.noBio": "لا توجد نبذة.",
   "profile.privateStreak": "هذا المستخدم يخفي الاستمرارية.",
   "profile.unavailable": "الملف غير متاح.",
+  "profile.downloadPhoto": "تنزيل الصورة",
   "profile.replayGuide": "إعادة شرح التطبيق",
 
   "guide.kicker": "شرح سريع",
@@ -634,7 +640,7 @@ const ar: Record<keyof typeof en, string> = {
   "guide.slide1Body": "بتبدأ بـ 100 نقاط. كل مهمة بتعملها بتأثر على نقاطك والاستمرارية والسجل الخاص بيك.",
   "guide.slide2Title": "المهام والنقاط",
   "guide.slide2Body":
-    "عندك مهام عادية، بعداد، بالوقت. اختار الوقت الي عملت فيه المهمة, صيام أو إفطار. وقت الصيام النقاط بتتحسب ×1.5.",
+    "عندك مهام عادية، بعداد، وبالوقت. اختار التوقيت اللي عملت فيه المهمة: صيام أو إفطار. مضاعف ×1.5 بيتطبق حسب إعداد المشرف.",
   "guide.slide3Title": "المهام الممنوعة خاصة بيك",
   "guide.slide3Body":
     "تسجيل مهمة ممنوعة بيقلل النقاط، وبيظهر لك أنت فقط. المشرف ميقدرش يطلع عليها, فا سجل الممنوعات ومتحرجش عشان نظام المسابقة يفضل متوازن.",

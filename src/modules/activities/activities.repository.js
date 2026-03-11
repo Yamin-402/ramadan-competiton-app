@@ -21,6 +21,16 @@ const taskInclude = {
 };
 
 export const activitiesRepository = {
+  getAppSetting(key) {
+    return prisma.appSetting.findUnique({
+      where: { key },
+      select: {
+        key: true,
+        value: true,
+      },
+    });
+  },
+
   findTaskById(taskId) {
     return prisma.task.findUnique({
       where: { id: taskId },

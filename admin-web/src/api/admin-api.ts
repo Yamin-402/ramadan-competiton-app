@@ -6,9 +6,11 @@ import {
   AdminTaskCounterRule,
   AdminUserActivity,
   AdminUser,
+  DailyQuestionSuggestion,
   DailyQuestionListItem,
   LeaderboardRow,
   NotificationCampaignListItem,
+  ScoringSettings,
   TaskCreatePayload,
 } from "../types";
 import { requestData } from "./http";
@@ -177,6 +179,7 @@ export const adminApi = {
     title: string;
     body: string;
     targetType: "ALL_USERS" | "TAGS" | "USER_IDS";
+    isAnnouncement?: boolean;
     filters: {
       tagIds: number[];
       userIds: number[];
@@ -226,6 +229,17 @@ export const adminApi = {
       method: "GET",
       url: "/admin/daily-questions",
       params: { limit },
+    });
+  },
+
+  listDailyQuestionSuggestions(params: {
+    answerType: "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
+    limit?: number;
+  }) {
+    return requestData<DailyQuestionSuggestion[]>({
+      method: "GET",
+      url: "/admin/daily-questions/suggestions",
+      params,
     });
   },
 
@@ -328,6 +342,21 @@ export const adminApi = {
     return requestData<AdminAccessUser>({
       method: "PATCH",
       url: `/admin/users/${userId}/admin-access`,
+      data: payload,
+    });
+  },
+
+  getScoringSettings() {
+    return requestData<ScoringSettings>({
+      method: "GET",
+      url: "/admin/settings/scoring",
+    });
+  },
+
+  updateScoringSettings(payload: ScoringSettings) {
+    return requestData<ScoringSettings>({
+      method: "PATCH",
+      url: "/admin/settings/scoring",
       data: payload,
     });
   },

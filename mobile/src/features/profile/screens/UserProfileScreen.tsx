@@ -1,7 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { usersApi } from "../../../api/endpoints/users.api";
 import { getApiErrorMessage } from "../../../api/client";
 import { AppCard } from "../../../components/AppCard";
@@ -22,6 +22,8 @@ export function UserProfileScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof usersApi.getPublicProfile>> | null>(null);
+  const [imageOpen, setImageOpen] = useState(false);
+  const [imageMenuOpen, setImageMenuOpen] = useState(false);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -63,17 +65,45 @@ export function UserProfileScreen({ route }: Props) {
     [displayName]
   );
 
+  const openAvatar = () => {
+    if (!avatarUrl) {
+      return;
+    }
+    setImageMenuOpen(false);
+    setImageOpen(true);
+  };
+
+  const closeAvatar = () => {
+    setImageMenuOpen(false);
+    setImageOpen(false);
+  };
+
+  const downloadAvatar = async () => {
+    if (!avatarUrl) {
+      return;
+    }
+    try {
+      await Linking.openURL(avatarUrl);
+    } catch {
+      // no-op
+    } finally {
+      setImageMenuOpen(false);
+    }
+  };
+
   return (
     <ScreenContainer>
       <AppCard>
         <View style={styles.headerRow}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-          )}
+          <Pressable onPress={openAvatar} disabled={!avatarUrl}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
+          </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: colors.textPrimary, textAlign }]}>{displayName}</Text>
             {educationLabel ? (
@@ -124,6 +154,28 @@ export function UserProfileScreen({ route }: Props) {
           <Text style={[styles.bio, { color: colors.textSecondary, textAlign }]}>{t("profile.unavailable")}</Text>
         </AppCard>
       ) : null}
+
+      <Modal transparent visible={imageOpen} animationType="fade" onRequestClose={closeAvatar}>
+        <View style={styles.imageOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeAvatar} />
+          <View style={styles.imageFrame}>
+            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.expandedImage} resizeMode="contain" /> : null}
+            <Pressable style={styles.imageMenuButton} onPress={() => setImageMenuOpen((prev) => !prev)}>
+              <Text style={styles.imageMenuButtonText}>⋮</Text>
+            </Pressable>
+            {imageMenuOpen ? (
+              <View style={[styles.imageMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Pressable onPress={() => void downloadAvatar()} style={styles.imageMenuItem}>
+                  <Text style={[styles.imageMenuText, { color: colors.textPrimary }]}>{t("profile.downloadPhoto")}</Text>
+                </Pressable>
+                <Pressable onPress={closeAvatar} style={styles.imageMenuItem}>
+                  <Text style={[styles.imageMenuText, { color: colors.textSecondary }]}>{t("common.done")}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -164,6 +216,59 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   error: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  imageOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.82)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  imageFrame: {
+    width: "100%",
+    maxWidth: 460,
+    aspectRatio: 1,
+    position: "relative",
+  },
+  expandedImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  imageMenuButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  imageMenuButtonText: {
+    color: "#fff",
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: "700",
+  },
+  imageMenu: {
+    position: "absolute",
+    top: 48,
+    right: 10,
+    minWidth: 150,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  imageMenuItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  imageMenuText: {
     fontSize: 13,
     fontWeight: "700",
   },

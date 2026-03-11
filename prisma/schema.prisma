@@ -381,6 +381,13 @@ model AdminActionLog {
   @@index([entityType, entityId])
 }
 
+model AppSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model NotificationCampaign {
   id           Int                    @id @default(autoincrement())
   title        String

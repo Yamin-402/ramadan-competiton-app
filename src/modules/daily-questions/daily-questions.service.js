@@ -142,7 +142,11 @@ export const dailyQuestionsService = {
     const userId = getAuthUserId(auth);
     await revealDueAnswersByFajr(new Date());
     const competitionDate = await resolveCompetitionDateByFajr(new Date());
-    const rows = await dailyQuestionsRepository.listUserHistory(userId, query.limit);
+    const rows = await dailyQuestionsRepository.listUserHistory(
+      userId,
+      query.limit,
+      competitionDate
+    );
 
     return rows.map((row) => ({
       id: row.answers[0]?.id || row.id * -1,

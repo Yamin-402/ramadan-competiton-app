@@ -61,6 +61,8 @@ export const authService = {
       throw new AppError(401, "Invalid credentials");
     }
 
+    await authRepository.ensureInitialPointsActivity(user.id, INITIAL_USER_POINTS);
+
     return {
       token: `dev-session-${user.id}`,
       user: toSessionUser(user),

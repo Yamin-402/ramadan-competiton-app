@@ -10,6 +10,12 @@ import { activitiesRepository } from "./activities.repository.js";
 import { streaksService } from "../streaks/streaks.service.js";
 import { isStreakEnabledTask } from "../streaks/streaks.utils.js";
 
+const SCORING_MULTIPLIER_SETTING_KEY = "SCORING_MULTIPLIER";
+const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
+  value: 1.5,
+  applyDuring: "IFTAR",
+};
+
 function isCounterTask(task) {
   if (task.type === "COUNTER") {
     return true;
@@ -153,6 +159,15 @@ function parseConditionalRewardTiers(task) {
   return tiers.sort((left, right) => left.requiredCount - right.requiredCount);
 }
 
+function parseConditionalScoringMode(task) {
+  const raw = configString(task, "conditionalScoringMode")?.toUpperCase();
+  if (raw === "PERCENT_PER_CHILD" || raw === "POINTS_PER_CHILD") {
+    return raw;
+  }
+
+  return "TIER";
+}
+
 function parseConditionalChildConfig(task) {
   const childSource = parseConditionalChildSource(task);
   if (childSource === "NEW_CHILD_TASKS") {
@@ -169,14 +184,27 @@ function parseConditionalChildConfig(task) {
     return null;
   }
 
+  const scoringMode = parseConditionalScoringMode(task);
   const tiers = parseConditionalRewardTiers(task);
-  if (tiers.length === 0) {
+  const perChildPercent = configPositiveNumber(task, "conditionalPerChildPercent");
+  const perChildPoints = configPositiveNumber(task, "conditionalPerChildPoints");
+
+  if (scoringMode === "TIER" && tiers.length === 0) {
+    return null;
+  }
+  if (scoringMode === "PERCENT_PER_CHILD" && !perChildPercent) {
+    return null;
+  }
+  if (scoringMode === "POINTS_PER_CHILD" && !perChildPoints) {
     return null;
   }
 
   return {
     childTaskIds,
+    scoringMode,
     tiers,
+    perChildPercent,
+    perChildPoints,
   };
 }
 
@@ -253,13 +281,26 @@ function parseConditionalInlineConfig(task) {
     .filter(Boolean)
     .sort((left, right) => left.requiredCount - right.requiredCount);
 
-  if (tiers.length === 0) {
+  const scoringMode = parseConditionalScoringMode(task);
+  const perChildPercent = configPositiveNumber(task, "conditionalPerChildPercent");
+  const perChildPoints = configPositiveNumber(task, "conditionalPerChildPoints");
+
+  if (scoringMode === "TIER" && tiers.length === 0) {
+    return null;
+  }
+  if (scoringMode === "PERCENT_PER_CHILD" && !perChildPercent) {
+    return null;
+  }
+  if (scoringMode === "POINTS_PER_CHILD" && !perChildPoints) {
     return null;
   }
 
   return {
     tasks: inlineTasks,
+    scoringMode,
     tiers,
+    perChildPercent,
+    perChildPoints,
   };
 }
 
@@ -503,6 +544,32 @@ async function assertNotAlreadyCompletedInCompetitionDay(task, userId, occurredA
   if (count >= completionLimit) {
     throw new AppError(409, "Task already logged for this competition day");
   }
+}
+
+async function resolveScoringMultiplierConfig() {
+  const row = await activitiesRepository.getAppSetting(SCORING_MULTIPLIER_SETTING_KEY);
+  const settingValue =
+    row?.value && typeof row.value === "object" && !Array.isArray(row.value)
+      ? row.value
+      : null;
+
+  const rawValue = Number(settingValue?.value);
+  const multiplierValue =
+    Number.isFinite(rawValue) && rawValue >= 1 ? Number(rawValue.toFixed(2)) : DEFAULT_SCORING_MULTIPLIER_CONFIG.value;
+
+  const rawApplyDuring =
+    typeof settingValue?.applyDuring === "string"
+      ? settingValue.applyDuring.trim().toUpperCase()
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+  const applyDuring =
+    rawApplyDuring === "FASTING" || rawApplyDuring === "IFTAR"
+      ? rawApplyDuring
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+
+  return {
+    value: multiplierValue,
+    applyDuring,
+  };
 }
 
 function resolvePointUnits(task, payload) {
@@ -779,6 +846,37 @@ function evaluateInlineTierPoints(tiers, selectedKeysSet, selectedCount) {
   return Number(points.toFixed(2));
 }
 
+function evaluatePerChildTargetPoints({
+  scoringMode,
+  perChildPercent,
+  perChildPoints,
+  childCount,
+  basePoints,
+}) {
+  if (!Number.isFinite(childCount) || childCount <= 0) {
+    return 0;
+  }
+
+  const totalBasePoints = Number(basePoints);
+  if (!Number.isFinite(totalBasePoints) || totalBasePoints <= 0) {
+    return 0;
+  }
+
+  if (scoringMode === "PERCENT_PER_CHILD") {
+    const percentPerChild = Number(perChildPercent || 0);
+    const rawPoints = totalBasePoints * (percentPerChild / 100) * childCount;
+    return Number(Math.min(totalBasePoints, Math.max(0, rawPoints)).toFixed(2));
+  }
+
+  if (scoringMode === "POINTS_PER_CHILD") {
+    const pointsPerChild = Number(perChildPoints || 0);
+    const rawPoints = pointsPerChild * childCount;
+    return Number(Math.min(totalBasePoints, Math.max(0, rawPoints)).toFixed(2));
+  }
+
+  return 0;
+}
+
 async function maybeCreateConditionalChildBonusActivities({
   userId,
   sourceTaskId,
@@ -818,13 +916,22 @@ async function maybeCreateConditionalChildBonusActivities({
       endAt: windowEnd,
     });
     const completedTaskIdsSet = new Set(completedTaskIds);
-    const completedCount = totalCompletions;
+    const completedDistinctCount = completedTaskIdsSet.size;
 
-    const targetPoints = evaluateConditionalTierPoints(
-      childConfig.tiers,
-      completedTaskIdsSet,
-      completedCount
-    );
+    const targetPoints =
+      childConfig.scoringMode === "TIER"
+        ? evaluateConditionalTierPoints(
+            childConfig.tiers,
+            completedTaskIdsSet,
+            completedDistinctCount
+          )
+        : evaluatePerChildTargetPoints({
+            scoringMode: childConfig.scoringMode,
+            perChildPercent: childConfig.perChildPercent,
+            perChildPoints: childConfig.perChildPoints,
+            childCount: completedDistinctCount,
+            basePoints: Number(parentTask.basePoints),
+          });
 
     if (targetPoints <= 0) {
       continue;
@@ -866,10 +973,11 @@ async function maybeCreateConditionalChildBonusActivities({
       metadata: {
         kind: "CONDITIONAL_CHILD_BONUS",
         competitionDate: competitionDateString,
-        completedCount,
-        completedDistinctCount: completedTaskIdsSet.size,
+        completedCount: totalCompletions,
+        completedDistinctCount,
         completedTaskIds: Array.from(completedTaskIdsSet),
         targetPoints,
+        scoringMode: childConfig.scoringMode,
       },
     });
   }
@@ -911,7 +1019,10 @@ export const activitiesService = {
       typeof payload.isDuringFasting === "boolean"
         ? payload.isDuringFasting
         : await isDuringFastingTime(occurredAt);
-    const fastingMultiplier = isDuringFasting ? 1.5 : 1;
+    const scoringMultiplierConfig = await resolveScoringMultiplierConfig();
+    const shouldApplyMultiplier =
+      scoringMultiplierConfig.applyDuring === "FASTING" ? isDuringFasting : !isDuringFasting;
+    const fastingMultiplier = shouldApplyMultiplier ? scoringMultiplierConfig.value : 1;
     const shouldApplyStreak = isStreakEnabledTask(task);
     const streakMultiplier = shouldApplyStreak
       ? await streaksService.getRewardMultiplierForNewActivity(userId, task.id, occurredAt)
@@ -945,11 +1056,20 @@ export const activitiesService = {
       }
 
       const selectedKeysSet = new Set(filteredSelectedKeys);
-      const inlinePoints = evaluateInlineTierPoints(
-        inlineConditionalConfig.tiers,
-        selectedKeysSet,
-        filteredSelectedKeys.length
-      );
+      const inlinePoints =
+        inlineConditionalConfig.scoringMode === "TIER"
+          ? evaluateInlineTierPoints(
+              inlineConditionalConfig.tiers,
+              selectedKeysSet,
+              filteredSelectedKeys.length
+            )
+          : evaluatePerChildTargetPoints({
+              scoringMode: inlineConditionalConfig.scoringMode,
+              perChildPercent: inlineConditionalConfig.perChildPercent,
+              perChildPoints: inlineConditionalConfig.perChildPoints,
+              childCount: filteredSelectedKeys.length,
+              basePoints: Number(task.basePoints),
+            });
       basePoints = Number(inlinePoints.toFixed(2));
 
       const selectedInlineTasks = inlineConditionalConfig.tasks
@@ -963,6 +1083,7 @@ export const activitiesService = {
       activityMetadata.selectedInlineTaskKeys = filteredSelectedKeys;
       activityMetadata.selectedInlineTasks = selectedInlineTasks;
       activityMetadata.inlineSelectedCount = filteredSelectedKeys.length;
+      activityMetadata.conditionalScoringMode = inlineConditionalConfig.scoringMode;
     } else {
       basePoints = Number((Number(task.basePoints) * pointUnits).toFixed(2));
     }
@@ -998,6 +1119,7 @@ export const activitiesService = {
         streakMultiplier,
         pointUnits,
         activityAmount: typeof payload.amount === "number" ? payload.amount : null,
+        scoringMultiplierApplyDuring: scoringMultiplierConfig.applyDuring,
         isDuringFastingOverride: typeof payload.isDuringFasting === "boolean",
       },
       isForbidden: task.type === "FORBIDDEN",

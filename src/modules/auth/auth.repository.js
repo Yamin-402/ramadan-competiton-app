@@ -91,4 +91,43 @@ export const authRepository = {
       return user;
     });
   },
+
+  async ensureInitialPointsActivity(userId, initialPoints = 100) {
+    const existing = await prisma.activity.findFirst({
+      where: {
+        userId,
+        type: "SYSTEM",
+        OR: [
+          { note: "Initial points balance" },
+          {
+            metadata: {
+              path: ["kind"],
+              equals: "INITIAL_POINTS",
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return prisma.activity.create({
+      data: {
+        userId,
+        type: "SYSTEM",
+        isDuringFasting: false,
+        fastingMultiplier: 1,
+        basePoints: initialPoints,
+        effectivePoints: initialPoints,
+        note: "Initial points balance",
+        metadata: {
+          kind: "INITIAL_POINTS",
+        },
+      },
+      select: { id: true },
+    });
+  },
 };

@@ -143,6 +143,12 @@ export interface NotificationRecipient {
     status: string;
     sentAt: string | null;
     createdAt: string;
+    filters?: {
+      isAnnouncement?: boolean;
+      tagIds?: number[];
+      userIds?: number[];
+      [key: string]: unknown;
+    } | null;
   };
 }
 

@@ -8,6 +8,7 @@ const conditionOperatorSchema = z.enum(["EQ", "NEQ", "GT", "GTE", "LT", "LTE"]);
 const notificationTargetTypeSchema = z.enum(["ALL_USERS", "TAGS", "USER_IDS"]);
 const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"]);
 const adminRoleSchema = z.enum(["ADMIN", "SUPER_ADMIN"]);
+const scoringMultiplierTimingSchema = z.enum(["FASTING", "IFTAR"]);
 
 const adminPermissionsSchema = z.array(z.string().min(1)).max(50);
 const categoryTagSchema = z.object({
@@ -148,6 +149,7 @@ export const createNotificationCampaignSchema = z.object({
   title: z.string().min(2),
   body: z.string().min(2),
   targetType: notificationTargetTypeSchema.default("ALL_USERS"),
+  isAnnouncement: z.boolean().optional(),
   filters: z
     .object({
       tagIds: z.array(z.number().int().positive()).default([]),
@@ -190,6 +192,11 @@ export const listDailyQuestionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+export const listDailyQuestionSuggestionsQuerySchema = z.object({
+  answerType: dailyQuestionTypeSchema,
+  limit: z.coerce.number().int().min(1).max(10).default(5),
+});
+
 export const dailyQuestionParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
@@ -222,4 +229,9 @@ export const createAdminAccountSchema = z.object({
 export const updateAdminAccessSchema = z.object({
   role: adminRoleSchema.optional(),
   adminPermissions: adminPermissionsSchema.optional(),
+});
+
+export const updateScoringSettingsSchema = z.object({
+  multiplierValue: z.number().min(1).max(10),
+  applyDuring: scoringMultiplierTimingSchema,
 });

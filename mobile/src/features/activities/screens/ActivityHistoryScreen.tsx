@@ -311,6 +311,15 @@ function getInlineMinorTaskLabels(
     .map((key) => getInlineTaskLabelFromTaskConfig(item, key, isArabic) || friendlyInlineKeyLabel(key));
 }
 
+function isInitialPointsActivity(item: Activity): boolean {
+  if (item.type !== "SYSTEM") {
+    return false;
+  }
+
+  const metadata = getActivityMetadata(item);
+  return metadata?.kind === "INITIAL_POINTS";
+}
+
 export function ActivityHistoryScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
@@ -385,45 +394,41 @@ export function ActivityHistoryScreen() {
       .sort((left, right) => right.key.localeCompare(left.key));
   }, [rows]);
 
-  const overallPoints = useMemo(
+  const summaryRows = useMemo(
     () =>
-      rows
-        .filter(
-          (row) =>
-            row.type === "TASK_COMPLETION" ||
-            row.type === "DAILY_QUESTION_ANSWER" ||
-            row.type === "MANUAL_ADJUSTMENT"
-        )
-        .reduce((sum, row) => sum + toNumber(row.effectivePoints), 0),
+      rows.filter(
+        (row) =>
+          row.type === "TASK_COMPLETION" ||
+          row.type === "DAILY_QUESTION_ANSWER" ||
+          row.type === "MANUAL_ADJUSTMENT" ||
+          isInitialPointsActivity(row)
+      ),
     [rows]
+  );
+  const initialPointsFallback = useMemo(
+    () => (summaryRows.some((row) => isInitialPointsActivity(row)) ? 0 : 100),
+    [summaryRows]
+  );
+
+  const overallPoints = useMemo(
+    () => summaryRows.reduce((sum, row) => sum + toNumber(row.effectivePoints), initialPointsFallback),
+    [initialPointsFallback, summaryRows]
   );
   const pointsGained = useMemo(
     () =>
-      rows
-        .filter(
-          (row) =>
-            row.type === "TASK_COMPLETION" ||
-            row.type === "DAILY_QUESTION_ANSWER" ||
-            row.type === "MANUAL_ADJUSTMENT"
-        )
+      summaryRows
         .map((row) => toNumber(row.effectivePoints))
         .filter((value) => value > 0)
-        .reduce((sum, value) => sum + value, 0),
-    [rows]
+        .reduce((sum, value) => sum + value, initialPointsFallback),
+    [initialPointsFallback, summaryRows]
   );
   const pointsLost = useMemo(
     () =>
-      rows
-        .filter(
-          (row) =>
-            row.type === "TASK_COMPLETION" ||
-            row.type === "DAILY_QUESTION_ANSWER" ||
-            row.type === "MANUAL_ADJUSTMENT"
-        )
+      summaryRows
         .map((row) => toNumber(row.effectivePoints))
         .filter((value) => value < 0)
         .reduce((sum, value) => sum + Math.abs(value), 0),
-    [rows]
+    [summaryRows]
   );
 
   const toggleDay = (key: string) => {

@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GlobalNotificationOverlay } from "../components/GlobalNotificationOverlay";
+import { GlobalAnnouncementPopup } from "../components/GlobalAnnouncementPopup";
 import { LoadingBlock } from "../components/LoadingBlock";
 import { useAppTheme } from "../hooks/use-app-theme";
 import { useI18n } from "../hooks/use-i18n";
@@ -32,6 +33,7 @@ export function AppRoot() {
         >
           <RootNavigator />
         </NavigationContainer>
+        <GlobalAnnouncementPopup />
         <GlobalNotificationOverlay />
         <StatusBar
           style={theme.mode === "dark" ? "light" : "dark"}
