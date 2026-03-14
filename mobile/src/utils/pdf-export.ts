@@ -1,6 +1,4 @@
 import { Platform } from "react-native";
-import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
@@ -27,6 +25,10 @@ export async function loadArabicFontBase64() {
     return cachedArabicFontBase64;
   }
   try {
+    const [{ Asset }, FileSystem] = await Promise.all([
+      import("expo-asset"),
+      import("expo-file-system"),
+    ]);
     const asset = Asset.fromModule(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       require("../../assets/fonts/NotoNaskhArabic-Regular.ttf")

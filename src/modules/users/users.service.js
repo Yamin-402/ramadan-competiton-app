@@ -500,14 +500,33 @@ export const usersService = {
       throw new AppError(404, "User not found");
     }
 
-    const fromDate = new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000);
-    const [activities, streaks, aiSettings] = await Promise.all([
-      usersRepository.listActivitiesForReport(userId, fromDate),
-      usersRepository.listStreaksForUser(userId),
-      readAiAssistSettings(),
-    ]);
+    let activities = [];
+    let streaks = [];
+    let aiSettings = DEFAULT_AI_ASSIST_SETTINGS;
+    try {
+      const fromDate = new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000);
+      const [activitiesResult, streaksResult, aiSettingsResult] = await Promise.all([
+        usersRepository.listActivitiesForReport(userId, fromDate),
+        usersRepository.listStreaksForUser(userId),
+        readAiAssistSettings(),
+      ]);
+      activities = activitiesResult || [];
+      streaks = streaksResult || [];
+      aiSettings = aiSettingsResult || DEFAULT_AI_ASSIST_SETTINGS;
+    } catch {
+      // fallback to empty analytics if data fetch fails
+      activities = [];
+      streaks = [];
+      aiSettings = DEFAULT_AI_ASSIST_SETTINGS;
+    }
 
-    const analytics = buildAnalytics(activities, streaks, options);
+    let analytics;
+    try {
+      analytics = buildAnalytics(activities, streaks, options);
+    } catch {
+      analytics = buildAnalytics([], [], options);
+    }
+
     const report = await maybeGenerateReportWithAi(aiSettings, profile, analytics, options);
 
     return {

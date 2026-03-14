@@ -1,10 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
+import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { usersApi } from "../../../api/endpoints/users.api";
 import { getApiErrorMessage } from "../../../api/client";
 import { AppCard } from "../../../components/AppCard";
@@ -94,52 +91,71 @@ export function UserProfileScreen({ route }: Props) {
       }
       setToastMessage(isArabic ? "جاري التحميل..." : "Downloading...");
       const normalized = avatarUrl.trim();
-      const baseName = `profile_${userId}_${Date.now()}`;
-      let fileUri = "";
-      let extension = "jpg";
-
-      if (normalized.startsWith("data:")) {
-        const match = normalized.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
-        if (!match) {
-          throw new Error("Invalid data url");
-        }
-        const mime = match[1];
-        extension = mime.split("/")[1] || "jpg";
-        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
-        await FileSystem.writeAsStringAsync(fileUri, match[2], {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      } else if (normalized.startsWith("file://")) {
-        extension = normalized.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
-        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
-        await FileSystem.copyAsync({ from: normalized, to: fileUri });
+      if (Platform.OS === "web") {
+        await Linking.openURL(normalized);
+        setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
       } else {
-        let downloadUrl = normalized;
-        if (!/^https?:\/\//i.test(downloadUrl)) {
-          const base = API_BASE_URL.replace(/\/api\/v1$/i, "");
-          downloadUrl = downloadUrl.startsWith("/") ? `${base}${downloadUrl}` : `${base}/${downloadUrl}`;
-        }
-        extension = downloadUrl.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
-        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
-        const download = await FileSystem.downloadAsync(downloadUrl, fileUri);
-        fileUri = download.uri;
-      }
+        const FileSystem = await import("expo-file-system");
+        const MediaLibrary = await import("expo-media-library");
+        const Sharing = await import("expo-sharing");
 
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (permission.status === "granted") {
-        await MediaLibrary.createAssetAsync(fileUri);
-        setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
-      } else {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: `image/${extension === "jpg" ? "jpeg" : extension}`,
-            dialogTitle: t("profile.downloadPhoto"),
+        const baseName = `profile_${userId}_${Date.now()}`;
+        let fileUri = "";
+        let extension = "jpg";
+
+        if (normalized.startsWith("data:")) {
+          const match = normalized.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+          if (!match) {
+            throw new Error("Invalid data url");
+          }
+          const mime = match[1];
+          extension = mime.split("/")[1] || "jpg";
+          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+          await FileSystem.writeAsStringAsync(fileUri, match[2], {
+            encoding: FileSystem.EncodingType.Base64,
           });
-          setToastMessage(isArabic ? "تم إرسال الصورة للمشاركة" : "Shared image");
+        } else if (normalized.startsWith("file://")) {
+          extension = normalized.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
+          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+          await FileSystem.copyAsync({ from: normalized, to: fileUri });
         } else {
-          await Linking.openURL(avatarUrl);
-          setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
+          let downloadUrl = normalized;
+          if (!/^https?:\/\//i.test(downloadUrl)) {
+            const base = API_BASE_URL.replace(/\/api\/v1$/i, "");
+            downloadUrl = downloadUrl.startsWith("/") ? `${base}${downloadUrl}` : `${base}/${downloadUrl}`;
+          }
+          extension = downloadUrl.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
+          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+          const download = await FileSystem.downloadAsync(downloadUrl, fileUri);
+          fileUri = download.uri;
+        }
+
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        const canSave =
+          permission.granted === true ||
+          permission.status === "granted" ||
+          permission.status === "limited" ||
+          permission.accessPrivileges === "limited";
+        if (canSave) {
+          try {
+            await MediaLibrary.createAssetAsync(fileUri);
+            setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
+          } catch {
+            await MediaLibrary.saveToLibraryAsync(fileUri);
+            setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
+          }
+        } else {
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(fileUri, {
+              mimeType: `image/${extension === "jpg" ? "jpeg" : extension}`,
+              dialogTitle: t("profile.downloadPhoto"),
+            });
+            setToastMessage(isArabic ? "تم إرسال الصورة للمشاركة" : "Shared image");
+          } else {
+            await Linking.openURL(avatarUrl);
+            setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
+          }
         }
       }
     } catch {
