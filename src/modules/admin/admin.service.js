@@ -4,6 +4,10 @@ import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
 import { getOrCreateFastingWindow } from "../../integrations/prayer-times/prayer-time.service.js";
 import { fetchIslamicDailyQuestionSuggestions } from "../../integrations/daily-question-suggestions/islamic-questions.client.js";
+import {
+  generateMotivationMessageWithAi,
+  rewriteDailyQuestionSuggestionWithAi,
+} from "../../integrations/ai-assistant/ai-assistant.client.js";
 import { normalizeAdminPermissions } from "../../core/auth/admin-permissions.js";
 import bcrypt from "bcrypt";
 import { adminRepository } from "./admin.repository.js";
@@ -13,6 +17,18 @@ const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
   multiplierValue: 1.5,
   applyDuring: "IFTAR",
 };
+const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
+const DEFAULT_AI_ASSIST_SETTINGS = {
+  enabled: false,
+  baseUrl: "https://ramadan-ai.fly.dev",
+  model: "qwen2.5:3b-instruct",
+  timeoutMs: 25000,
+};
+
+const WEEKDAY_FORMATTER_AR = new Intl.DateTimeFormat("ar-EG", {
+  timeZone: env.appTimezone,
+  weekday: "long",
+});
 
 function normalizeUniqueKeys(values) {
   return Array.from(
@@ -412,6 +428,409 @@ function normalizeScoringSettingsValue(value) {
     multiplierValue,
     applyDuring,
   };
+}
+
+function normalizeAiAssistSettingsValue(value) {
+  const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const enabled =
+    raw.enabled === true || String(raw.enabled || "").trim().toLowerCase() === "true";
+  const baseUrl =
+    typeof raw.baseUrl === "string" && raw.baseUrl.trim().length > 0
+      ? raw.baseUrl.trim().replace(/\/+$/, "")
+      : DEFAULT_AI_ASSIST_SETTINGS.baseUrl;
+  const model =
+    typeof raw.model === "string" && raw.model.trim().length > 0
+      ? raw.model.trim()
+      : DEFAULT_AI_ASSIST_SETTINGS.model;
+  const timeoutMsRaw = Number(raw.timeoutMs);
+  const timeoutMs = Number.isFinite(timeoutMsRaw)
+    ? Math.max(5000, Math.min(90000, Math.floor(timeoutMsRaw)))
+    : DEFAULT_AI_ASSIST_SETTINGS.timeoutMs;
+
+  return {
+    enabled,
+    baseUrl,
+    model,
+    timeoutMs,
+  };
+}
+
+async function readAiAssistSettings() {
+  const row = await adminRepository.getAppSetting(AI_ASSIST_SETTINGS_KEY);
+  return normalizeAiAssistSettingsValue(row?.value);
+}
+
+function normalizeSuggestionTopic(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
+  if (
+    normalized === "FIQH" ||
+    normalized === "HADITH" ||
+    normalized === "QURAN" ||
+    normalized === "AQEEDAH" ||
+    normalized === "SEERAH" ||
+    normalized === "AKHLAQ"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeSuggestionDifficulty(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
+  if (normalized === "EASY" || normalized === "MEDIUM" || normalized === "HARD") {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeStringArray(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
+function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion) {
+  const suggestion =
+    rawSuggestion && typeof rawSuggestion === "object" && !Array.isArray(rawSuggestion)
+      ? rawSuggestion
+      : {};
+
+  const questionText = String(suggestion.questionText || fallbackSuggestion.questionText || "").trim();
+  if (!questionText) {
+    return null;
+  }
+
+  const answerExplanation = String(
+    suggestion.answerExplanation || fallbackSuggestion.answerExplanation || ""
+  ).trim();
+  const topic =
+    normalizeSuggestionTopic(suggestion.topic) ||
+    normalizeSuggestionTopic(fallbackSuggestion.topic) ||
+    "FIQH";
+  const difficulty =
+    normalizeSuggestionDifficulty(suggestion.difficulty) ||
+    normalizeSuggestionDifficulty(fallbackSuggestion.difficulty) ||
+    "MEDIUM";
+
+  const base = {
+    source: fallbackSuggestion.source || "islamqa_hf",
+    questionText: questionText.slice(0, 220),
+    answerType,
+    answerExplanation: answerExplanation.slice(0, 320),
+    topic,
+    difficulty,
+  };
+
+  if (answerType === "TEXT") {
+    const correctAnswer = String(
+      suggestion.correctAnswer ?? fallbackSuggestion.correctAnswer ?? ""
+    ).trim();
+    return {
+      ...base,
+      options: null,
+      correctAnswer: correctAnswer.slice(0, 160),
+    };
+  }
+
+  if (answerType === "BOOLEAN") {
+    const boolValue = parseBoolean(suggestion.correctAnswer);
+    const fallbackBool = parseBoolean(fallbackSuggestion.correctAnswer);
+    const correctAnswer = boolValue !== null ? boolValue : fallbackBool === true;
+    return {
+      ...base,
+      options: ["\u0646\u0639\u0645", "\u0644\u0627"],
+      correctAnswer,
+    };
+  }
+
+  const options = normalizeStringArray(suggestion.options);
+  const fallbackOptions = normalizeStringArray(fallbackSuggestion.options);
+  const resolvedOptions = options.length >= 2 ? options.slice(0, 6) : fallbackOptions.slice(0, 6);
+  if (resolvedOptions.length < 2) {
+    return null;
+  }
+
+  if (answerType === "SINGLE_CHOICE") {
+    const correctAnswer = String(
+      suggestion.correctAnswer ?? fallbackSuggestion.correctAnswer ?? resolvedOptions[0]
+    ).trim();
+    const resolvedCorrect = resolvedOptions.includes(correctAnswer)
+      ? correctAnswer
+      : resolvedOptions[0];
+    return {
+      ...base,
+      options: resolvedOptions,
+      correctAnswer: resolvedCorrect,
+    };
+  }
+
+  const candidateCorrectArray = normalizeStringArray(suggestion.correctAnswer);
+  const fallbackCorrectArray = normalizeStringArray(fallbackSuggestion.correctAnswer);
+  const rawCorrectArray = candidateCorrectArray.length > 0 ? candidateCorrectArray : fallbackCorrectArray;
+  const resolvedCorrectArray = rawCorrectArray.filter((value) => resolvedOptions.includes(value));
+  const finalCorrectArray = resolvedCorrectArray.length > 0 ? resolvedCorrectArray : [resolvedOptions[0]];
+
+  return {
+    ...base,
+    options: resolvedOptions,
+    correctAnswer: finalCorrectArray,
+  };
+}
+
+function buildDailyQuestionStyleProfile(rows) {
+  const recentRows = Array.isArray(rows) ? rows.slice(0, 80) : [];
+  if (recentRows.length === 0) {
+    return {
+      totalQuestions: 0,
+      averageQuestionLength: 90,
+      averageExplanationLength: 120,
+      answerTypeDistribution: {},
+    };
+  }
+
+  let totalQuestionLength = 0;
+  let totalExplanationLength = 0;
+  const answerTypeDistribution = {};
+  for (const row of recentRows) {
+    const questionText = String(row?.questionText || "").trim();
+    totalQuestionLength += questionText.length;
+    const explanation = String(unpackCorrectAnswerExplanation(row?.correctAnswer) || "").trim();
+    totalExplanationLength += explanation.length;
+    const key = String(row?.answerType || "TEXT").trim();
+    answerTypeDistribution[key] = (answerTypeDistribution[key] || 0) + 1;
+  }
+
+  return {
+    totalQuestions: recentRows.length,
+    averageQuestionLength: Math.round(totalQuestionLength / recentRows.length),
+    averageExplanationLength: Math.round(totalExplanationLength / recentRows.length),
+    answerTypeDistribution,
+  };
+}
+
+async function maybeRewriteSuggestionWithAi(aiSettings, context) {
+  if (!aiSettings.enabled) {
+    return context.suggestion;
+  }
+
+  try {
+    const rewritten = await rewriteDailyQuestionSuggestionWithAi(aiSettings, context);
+    const normalized = normalizeSuggestionObject(
+      rewritten,
+      context.answerType,
+      context.suggestion
+    );
+    return normalized || context.suggestion;
+  } catch {
+    return context.suggestion;
+  }
+}
+
+function toDecimalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildWeekdayNamesInArabic() {
+  const weekdays = [];
+  const start = new Date(Date.UTC(2026, 0, 4, 12, 0, 0));
+  for (let index = 0; index < 7; index += 1) {
+    const date = new Date(start.getTime() + index * 24 * 60 * 60 * 1000);
+    weekdays.push(WEEKDAY_FORMATTER_AR.format(date));
+  }
+  return Array.from(new Set(weekdays));
+}
+
+const AR_WEEKDAYS = buildWeekdayNamesInArabic();
+
+function getCairoWeekdayName(date) {
+  return WEEKDAY_FORMATTER_AR.format(date);
+}
+
+function buildMotivationReportForUser(user, activities, lookbackDays) {
+  const byDate = new Map();
+  const byWeekday = new Map(AR_WEEKDAYS.map((name) => [name, 0]));
+  let totalPoints = 0;
+  let totalTasks = 0;
+
+  for (const row of activities) {
+    const occurredAt = new Date(row.occurredAt);
+    const dateKey = toAppDateString(occurredAt);
+    const weekdayName = getCairoWeekdayName(occurredAt);
+    const points = toDecimalNumber(row.effectivePoints);
+
+    totalTasks += 1;
+    totalPoints += points;
+
+    byWeekday.set(weekdayName, (byWeekday.get(weekdayName) || 0) + 1);
+    if (!byDate.has(dateKey)) {
+      byDate.set(dateKey, {
+        tasks: 0,
+        points: 0,
+      });
+    }
+    const dayRow = byDate.get(dateKey);
+    dayRow.tasks += 1;
+    dayRow.points += points;
+  }
+
+  const activeDays = byDate.size;
+  const inactiveDays = Math.max(0, lookbackDays - activeDays);
+  const byDateRows = Array.from(byDate.entries());
+
+  let bestDate = null;
+  let weakestDate = null;
+  let bestDateTasks = -1;
+  let weakestDateTasks = Number.POSITIVE_INFINITY;
+
+  for (const [dateKey, dayRow] of byDateRows) {
+    if (dayRow.tasks > bestDateTasks) {
+      bestDateTasks = dayRow.tasks;
+      bestDate = dateKey;
+    }
+    if (dayRow.tasks < weakestDateTasks) {
+      weakestDateTasks = dayRow.tasks;
+      weakestDate = dateKey;
+    }
+  }
+
+  let bestWeekday = null;
+  let weakestWeekday = null;
+  let bestWeekdayCount = -1;
+  let weakestWeekdayCount = Number.POSITIVE_INFINITY;
+
+  for (const [weekdayName, count] of byWeekday.entries()) {
+    if (count > bestWeekdayCount) {
+      bestWeekdayCount = count;
+      bestWeekday = weekdayName;
+    }
+    if (count < weakestWeekdayCount) {
+      weakestWeekdayCount = count;
+      weakestWeekday = weekdayName;
+    }
+  }
+
+  const summary = `\u062e\u0644\u0627\u0644 \u0622\u062e\u0631 ${lookbackDays} \u064a\u0648\u0645: \u0623\u0646\u062c\u0632\u062a ${totalTasks} \u0645\u0647\u0645\u0629 \u0641\u064a ${activeDays} \u064a\u0648\u0645 \u0646\u0634\u0637. \u0623\u0642\u0648\u0649 \u0646\u0634\u0627\u0637 \u0639\u0646\u062f\u0643 \u064a\u0648\u0645 ${bestWeekday || "-"}\u060c \u0648\u0623\u0642\u0644 \u0646\u0634\u0627\u0637 \u064a\u0648\u0645 ${weakestWeekday || "-"}.`;
+
+  return {
+    userId: user.id,
+    displayName: user.displayName,
+    email: user.email,
+    summary,
+    stats: {
+      lookbackDays,
+      totalTasks,
+      totalPoints: Number(totalPoints.toFixed(2)),
+      activeDays,
+      inactiveDays,
+      bestWeekday,
+      weakestWeekday,
+      bestDate,
+      weakestDate,
+    },
+  };
+}
+
+function buildFallbackMotivationMessage(report) {
+  const firstName = (report.displayName || report.email || "")
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+  const namePart = firstName ? ` ${firstName}` : "";
+
+  if (report.stats.totalTasks <= 0) {
+    return {
+      title: `\u0628\u062f\u0627\u064a\u0629 \u062c\u062f\u064a\u062f\u0629${namePart}`.trim(),
+      body: `\u064a\u0644\u0627 \u0646\u0628\u062f\u0623 \u0645\u0646 \u0627\u0644\u0646\u0647\u0627\u0631\u062f\u0647 \u0628\u0645\u0647\u0645\u0629 \u0648\u0627\u062d\u062f\u0629 \u0633\u0647\u0644\u0629. \u0627\u0644\u062e\u0637\u0648\u0629 \u0627\u0644\u0635\u063a\u064a\u0631\u0629 \u0628\u062a\u0641\u0631\u0642 \u062c\u062f\u0627\u064b.`.slice(
+        0,
+        220
+      ),
+    };
+  }
+
+  if (report.stats.inactiveDays > report.stats.activeDays) {
+    return {
+      title: `\u0631\u062c\u0648\u0639 \u0642\u0648\u064a${namePart}`.trim(),
+      body: `\u0623\u0643\u062a\u0631 \u064a\u0648\u0645 \u0647\u0627\u062f\u064a \u0639\u0646\u062f\u0643 \u0643\u0627\u0646 ${report.stats.weakestWeekday || "\u064a\u0648\u0645 \u0645\u0639\u064a\u0646"}. \u062c\u0631\u0628 \u062a\u062b\u0628\u062a \u0645\u0647\u0645\u0629 \u0648\u0627\u062d\u062f\u0629 \u0641\u064a \u0627\u0644\u064a\u0648\u0645 \u062f\u0647 \u0648\u062d\u062a\u0634\u0648\u0641 \u0641\u0631\u0642 \u0643\u0628\u064a\u0631.`.slice(
+        0,
+        220
+      ),
+    };
+  }
+
+  return {
+    title: `\u0645\u0633\u062a\u0648\u0649 \u0631\u0627\u0626\u0639${namePart}`.trim(),
+    body: `\u0623\u062d\u0633\u0646 \u064a\u0648\u0645 \u0646\u0634\u0627\u0637 \u0639\u0646\u062f\u0643 ${report.stats.bestWeekday || "\u064a\u0648\u0645 \u0645\u0645\u064a\u0632"}. \u0643\u0645\u0644 \u0628\u0646\u0641\u0633 \u0627\u0644\u0625\u064a\u0642\u0627\u0639 \u0648\u0632\u0648\u062f \u0645\u0647\u0645\u0629 \u0628\u0633\u064a\u0637\u0629 \u0643\u0645\u0627\u0646.`.slice(
+      0,
+      220
+    ),
+  };
+}
+
+function countArabicCharacters(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const matches = String(value).match(/[\u0600-\u06FF]/g);
+  return matches ? matches.length : 0;
+}
+
+function looksArabicEnough(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+
+  const arabicCount = countArabicCharacters(text);
+  if (arabicCount < 4) {
+    return false;
+  }
+
+  const letterCount = (text.match(/[A-Za-z\u0600-\u06FF]/g) || []).length;
+  if (letterCount <= 0) {
+    return false;
+  }
+
+  return arabicCount / letterCount >= 0.45;
+}
+
+async function maybeGenerateMotivationMessageWithAi(aiSettings, report) {
+  const fallback = buildFallbackMotivationMessage(report);
+  if (!aiSettings.enabled) {
+    return fallback;
+  }
+
+  try {
+    const generated = await generateMotivationMessageWithAi(aiSettings, {
+      displayName: report.displayName,
+      email: report.email,
+      summary: report.summary,
+      stats: report.stats,
+    });
+    const title = String(generated?.title || "").trim();
+    const body = String(generated?.body || "").trim();
+    if (!title || !body) {
+      return fallback;
+    }
+    if (!looksArabicEnough(title) || !looksArabicEnough(body)) {
+      return fallback;
+    }
+
+    return {
+      title: title.slice(0, 80),
+      body: body.slice(0, 220),
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export const adminService = {
@@ -1084,13 +1503,152 @@ export const adminService = {
   },
 
   async listDailyQuestionSuggestions(_auth, query) {
+    const aiSettings = await readAiAssistSettings();
+    const styleRows = await adminRepository.listDailyQuestions(80);
+    const styleProfile = buildDailyQuestionStyleProfile(styleRows);
+
+    let rawSuggestions;
     try {
-      return await fetchIslamicDailyQuestionSuggestions(query.answerType, query.limit);
+      rawSuggestions = await fetchIslamicDailyQuestionSuggestions(
+        query.answerType,
+        Math.max(query.limit * 3, 12),
+        query.topic,
+        query.difficulty
+      );
     } catch (error) {
       throw new AppError(502, "Could not fetch Islamic question suggestions", {
         cause: error?.message || "unknown_error",
       });
     }
+
+    const finalized = [];
+    for (const suggestion of rawSuggestions) {
+      if (finalized.length >= query.limit) {
+        break;
+      }
+
+      const rewritten = await maybeRewriteSuggestionWithAi(aiSettings, {
+        answerType: query.answerType,
+        topic: query.topic,
+        difficulty: query.difficulty,
+        styleProfile,
+        suggestion,
+      });
+      const normalized = normalizeSuggestionObject(
+        rewritten,
+        query.answerType,
+        suggestion
+      );
+      if (!normalized) {
+        continue;
+      }
+
+      const matchesTopic = !query.topic || query.topic === "ANY" || normalized.topic === query.topic;
+      const matchesDifficulty =
+        !query.difficulty || query.difficulty === "ANY" || normalized.difficulty === query.difficulty;
+      if (!matchesTopic || !matchesDifficulty) {
+        continue;
+      }
+
+      finalized.push(normalized);
+    }
+
+    return finalized.slice(0, query.limit);
+  },
+
+  async generateMotivationNotifications(auth, payload) {
+    const adminId = getAuthUserId(auth);
+    const aiSettings = await readAiAssistSettings();
+    const users = await adminRepository.listActiveParticipantUsers(payload.limitUsers);
+    if (users.length === 0) {
+      return {
+        generatedAt: new Date().toISOString(),
+        usersAnalyzed: 0,
+        notificationsCreated: 0,
+        dryRun: payload.dryRun,
+        reports: [],
+      };
+    }
+
+    const now = new Date();
+    const fromDate = new Date(
+      now.getTime() - payload.lookbackDays * 24 * 60 * 60 * 1000
+    );
+    const userIds = users.map((user) => user.id);
+    const activityRows = await adminRepository.listTaskCompletionActivitiesForUsers(
+      userIds,
+      fromDate
+    );
+
+    const activityByUserId = new Map();
+    for (const activity of activityRows) {
+      if (!activityByUserId.has(activity.userId)) {
+        activityByUserId.set(activity.userId, []);
+      }
+      activityByUserId.get(activity.userId).push(activity);
+    }
+
+    const reports = [];
+    let notificationsCreated = 0;
+    for (const user of users) {
+      const report = buildMotivationReportForUser(
+        user,
+        activityByUserId.get(user.id) || [],
+        payload.lookbackDays
+      );
+      const message = await maybeGenerateMotivationMessageWithAi(aiSettings, report);
+      const reportWithMessage = {
+        ...report,
+        title: message.title,
+        body: message.body,
+      };
+      reports.push(reportWithMessage);
+
+      if (!payload.dryRun) {
+        const campaign = await adminRepository.createNotificationCampaign(
+          {
+            title: reportWithMessage.title,
+            body: reportWithMessage.body,
+            targetType: "USER_IDS",
+            filters: {
+              tagIds: [],
+              userIds: [user.id],
+              isAnnouncement: false,
+            },
+            targetTagIds: [],
+          },
+          adminId
+        );
+        const createdRecipients = await adminRepository.createNotificationRecipients(
+          campaign.id,
+          [user.id]
+        );
+        notificationsCreated += Number(createdRecipients?.count || 0);
+      }
+    }
+
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "GENERATE_MOTIVATION_NOTIFICATIONS",
+      entityType: "NOTIFICATION_CAMPAIGN",
+      summary: payload.dryRun
+        ? `Generated ${reports.length} motivation reports (dry run)`
+        : `Generated ${reports.length} reports and ${notificationsCreated} motivation notifications`,
+      payload: {
+        lookbackDays: payload.lookbackDays,
+        usersAnalyzed: reports.length,
+        notificationsCreated,
+        dryRun: payload.dryRun,
+      },
+    });
+
+    return {
+      generatedAt: now.toISOString(),
+      usersAnalyzed: reports.length,
+      notificationsCreated,
+      dryRun: payload.dryRun,
+      reports,
+    };
   },
 
   async updateDailyQuestion(auth, questionId, payload) {
@@ -1363,5 +1921,39 @@ export const adminService = {
     });
 
     return normalizeScoringSettingsValue(updated?.value);
+  },
+
+  async getAiAssistSettings(_auth) {
+    return readAiAssistSettings();
+  },
+
+  async updateAiAssistSettings(auth, payload) {
+    const adminId = getAuthUserId(auth);
+    const current = await readAiAssistSettings();
+    const merged = normalizeAiAssistSettingsValue({
+      ...current,
+      ...payload,
+    });
+
+    const updated = await adminRepository.upsertAppSetting(
+      AI_ASSIST_SETTINGS_KEY,
+      merged
+    );
+
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "UPDATE_AI_ASSIST_SETTINGS",
+      entityType: "APP_SETTING",
+      entityId: AI_ASSIST_SETTINGS_KEY,
+      summary: `Updated AI assistant settings (enabled: ${merged.enabled})`,
+      payload: {
+        enabled: merged.enabled,
+        baseUrl: merged.baseUrl,
+        model: merged.model,
+        timeoutMs: merged.timeoutMs,
+      },
+    });
+
+    return normalizeAiAssistSettingsValue(updated?.value);
   },
 };

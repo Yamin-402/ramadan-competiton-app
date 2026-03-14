@@ -57,3 +57,23 @@ export const darkColors: AppColors = {
   tabActive: "#d4b35f",
   tabInactive: "#84a18d",
 };
+
+export const nightColors: AppColors = {
+  background: "#09071a",
+  card: "#1a133a",
+  cardSoft: "#231a4a",
+  textPrimary: "#f5efff",
+  textSecondary: "#c9bde7",
+  gold: "#f2c75a",
+  goldMuted: "#c89f3a",
+  greenDeep: "#1a133a",
+  border: "#5f4d93",
+  success: "#82d7a4",
+  warning: "#f2c75a",
+  danger: "#f1879f",
+  pattern: "rgba(201, 189, 231, 0.2)",
+  inputBackground: "#211949",
+  header: "#120c2a",
+  tabActive: "#f2c75a",
+  tabInactive: "#a69bcf",
+};

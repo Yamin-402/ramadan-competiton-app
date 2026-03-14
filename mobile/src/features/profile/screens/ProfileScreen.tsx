@@ -21,7 +21,7 @@ import {
 } from "../../../store/settings-store";
 
 const themeOptions: ThemePreference[] = ["system", "light", "dark"];
-const layoutOptions: TasksDesignVariant[] = ["classic", "ramadan_modern", "modern"];
+const layoutOptions: TasksDesignVariant[] = ["classic", "ramadan_modern", "ramadan_nights", "modern"];
 const languageOptions: AppLanguage[] = ["en", "ar"];
 
 function resolveEducationLevelLabel(
@@ -58,11 +58,14 @@ export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const textAlign = isArabic ? "right" : "left";
   const isModernVariant = tasksDesignVariant === "modern";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const modernCardStyle = isModernVariant
     ? mode === "dark"
       ? { backgroundColor: colors.card, borderColor: colors.border }
       : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
-    : undefined;
+    : isNightVariant
+      ? { backgroundColor: "#1c1542", borderColor: "#5d4a8f" }
+      : undefined;
 
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -302,6 +305,10 @@ export function ProfileScreen() {
                       ? t("profile.layoutClassic")
                       : option === "ramadan_modern"
                         ? t("profile.layoutRamadan")
+                        : option === "ramadan_nights"
+                          ? isArabic
+                            ? "ليالي رمضان"
+                            : "Ramadan Nights"
                         : t("profile.layoutModern")}
                   </Text>
                 </Pressable>

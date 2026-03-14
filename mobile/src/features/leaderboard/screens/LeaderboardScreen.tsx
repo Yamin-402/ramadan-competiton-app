@@ -63,11 +63,14 @@ export function LeaderboardScreen() {
   };
 
   const isModernVariant = tasksDesignVariant === "modern";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const modernCardStyle = isModernVariant
     ? mode === "dark"
       ? { backgroundColor: colors.card, borderColor: colors.border }
       : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
-    : undefined;
+    : isNightVariant
+      ? { backgroundColor: "#1c1542", borderColor: "#5d4a8f" }
+      : undefined;
 
   return (
     <ScreenContainer>

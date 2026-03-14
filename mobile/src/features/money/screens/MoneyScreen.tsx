@@ -25,11 +25,14 @@ export function MoneyScreen() {
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const textAlign = isArabic ? "right" : "left";
   const isModernVariant = tasksDesignVariant === "modern";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const modernCardStyle = isModernVariant
     ? mode === "dark"
       ? { backgroundColor: colors.card, borderColor: colors.border }
       : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
-    : undefined;
+    : isNightVariant
+      ? { backgroundColor: "#1c1542", borderColor: "#5d4a8f" }
+      : undefined;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);

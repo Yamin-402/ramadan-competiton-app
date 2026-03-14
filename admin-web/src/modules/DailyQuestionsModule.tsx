@@ -3,13 +3,26 @@ import { adminApi } from "../api/admin-api";
 import { toApiErrorMessage } from "../api/http";
 import { PanelCard } from "../components/PanelCard";
 import {
+  AiAssistSettings,
   AdminDailyQuestionAnswer,
+  DailyQuestionDifficulty,
   DailyQuestionListItem,
   DailyQuestionSuggestion,
+  DailyQuestionTopic,
   DailyQuestionType,
 } from "../types";
 
 const answerTypes: DailyQuestionType[] = ["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"];
+const suggestionTopics: DailyQuestionTopic[] = [
+  "ANY",
+  "FIQH",
+  "HADITH",
+  "QURAN",
+  "AQEEDAH",
+  "SEERAH",
+  "AKHLAQ",
+];
+const suggestionDifficulties: DailyQuestionDifficulty[] = ["ANY", "EASY", "MEDIUM", "HARD"];
 
 function toDateKey(value: string): string {
   return new Date(value).toISOString().slice(0, 10);
@@ -63,7 +76,7 @@ function formatAnswer(answer: unknown): string {
 
 function formatSuggestionAnswerPreview(suggestion: DailyQuestionSuggestion): string {
   if (suggestion.answerType === "BOOLEAN") {
-    return suggestion.correctAnswer === true ? "نعم" : "لا";
+    return suggestion.correctAnswer === true ? "\u0646\u0639\u0645" : "\u0644\u0627";
   }
 
   if (suggestion.answerType === "MULTIPLE_CHOICE") {
@@ -76,6 +89,40 @@ function formatSuggestionAnswerPreview(suggestion: DailyQuestionSuggestion): str
   }
 
   return String(suggestion.correctAnswer);
+}
+
+function topicLabel(value: DailyQuestionTopic | Exclude<DailyQuestionTopic, "ANY"> | null | undefined): string {
+  switch (value) {
+    case "FIQH":
+      return "Fiqh";
+    case "HADITH":
+      return "Hadith";
+    case "QURAN":
+      return "Quran";
+    case "AQEEDAH":
+      return "Aqeedah";
+    case "SEERAH":
+      return "Seerah";
+    case "AKHLAQ":
+      return "Akhlaq";
+    default:
+      return "Any";
+  }
+}
+
+function difficultyLabel(
+  value: DailyQuestionDifficulty | Exclude<DailyQuestionDifficulty, "ANY"> | null | undefined
+): string {
+  switch (value) {
+    case "EASY":
+      return "Easy";
+    case "MEDIUM":
+      return "Medium";
+    case "HARD":
+      return "Hard";
+    default:
+      return "Any";
+  }
 }
 
 export function DailyQuestionsModule() {
@@ -99,6 +146,17 @@ export function DailyQuestionsModule() {
   const [deletingQuestionId, setDeletingQuestionId] = useState<number | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<DailyQuestionSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionTopic, setSuggestionTopic] = useState<DailyQuestionTopic>("ANY");
+  const [suggestionDifficulty, setSuggestionDifficulty] = useState<DailyQuestionDifficulty>("ANY");
+  const [aiSettings, setAiSettings] = useState<AiAssistSettings>({
+    enabled: false,
+    baseUrl: "https://ramadan-ai.fly.dev",
+    model: "qwen2.5:3b-instruct",
+    timeoutMs: 25000,
+  });
+  const [loadingAiSettings, setLoadingAiSettings] = useState(false);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
 
   const [selectedQuestion, setSelectedQuestion] = useState<DailyQuestionListItem | null>(null);
   const [answerRows, setAnswerRows] = useState<AdminDailyQuestionAnswer[]>([]);
@@ -124,6 +182,8 @@ export function DailyQuestionsModule() {
     setActiveDate("");
     setIsActive(true);
     setEditingQuestionId(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
   const loadRows = async () => {
@@ -154,6 +214,22 @@ export function DailyQuestionsModule() {
 
   useEffect(() => {
     void loadRows();
+  }, []);
+
+  const loadAiSettings = async () => {
+    setLoadingAiSettings(true);
+    try {
+      const data = await adminApi.getAiAssistSettings();
+      setAiSettings(data);
+    } catch (err) {
+      setError(toApiErrorMessage(err, "Could not load AI settings"));
+    } finally {
+      setLoadingAiSettings(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAiSettings();
   }, []);
 
   const applyEditQuestion = (question: DailyQuestionListItem) => {
@@ -328,11 +404,14 @@ export function DailyQuestionsModule() {
     try {
       const data = await adminApi.listDailyQuestionSuggestions({
         answerType,
+        topic: suggestionTopic,
+        difficulty: suggestionDifficulty,
         limit: 6,
       });
       setSuggestions(data);
+      setShowSuggestions(true);
       if (data.length === 0) {
-        setSuccess("No Arabic Islamic suggestions right now. Try again.");
+        setSuccess("No suggestions found for the selected filters.");
       } else {
         setSuccess(`Loaded ${data.length} suggestion(s).`);
       }
@@ -398,6 +477,33 @@ export function DailyQuestionsModule() {
         .filter((index) => index >= 0)
     );
     setSingleCorrectIndex(0);
+  };
+
+  const closeSuggestions = () => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  const saveAiSettings = async () => {
+    setError(null);
+    setSuccess(null);
+    setSavingAiSettings(true);
+    try {
+      const timeoutMs = Number(aiSettings.timeoutMs);
+      const payload: Partial<AiAssistSettings> = {
+        enabled: aiSettings.enabled,
+        baseUrl: aiSettings.baseUrl.trim(),
+        model: aiSettings.model.trim(),
+        timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 25000,
+      };
+      const data = await adminApi.updateAiAssistSettings(payload);
+      setAiSettings(data);
+      setSuccess("AI settings saved.");
+    } catch (err) {
+      setError(toApiErrorMessage(err, "Could not save AI settings"));
+    } finally {
+      setSavingAiSettings(false);
+    }
   };
 
   const deleteQuestion = async (question: DailyQuestionListItem) => {
@@ -508,21 +614,119 @@ export function DailyQuestionsModule() {
             </select>
           </label>
 
+          <fieldset className="form-grid__full">
+            <legend>AI assistant settings</legend>
+            {loadingAiSettings ? <p className="muted-text">Loading AI settings...</p> : null}
+            <div className="inline-form">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={aiSettings.enabled}
+                  onChange={(event) =>
+                    setAiSettings((prev) => ({ ...prev, enabled: event.target.checked }))
+                  }
+                />
+                Enable AI rewriting
+              </label>
+              <label>
+                AI URL
+                <input
+                  value={aiSettings.baseUrl}
+                  onChange={(event) =>
+                    setAiSettings((prev) => ({ ...prev, baseUrl: event.target.value }))
+                  }
+                  placeholder="https://ramadan-ai.fly.dev"
+                />
+              </label>
+              <label>
+                Model
+                <input
+                  value={aiSettings.model}
+                  onChange={(event) =>
+                    setAiSettings((prev) => ({ ...prev, model: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Timeout ms
+                <input
+                  type="number"
+                  min={5000}
+                  max={90000}
+                  value={String(aiSettings.timeoutMs)}
+                  onChange={(event) =>
+                    setAiSettings((prev) => ({
+                      ...prev,
+                      timeoutMs: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <button type="button" onClick={() => void saveAiSettings()} disabled={savingAiSettings}>
+                {savingAiSettings ? "Saving..." : "Save AI settings"}
+              </button>
+            </div>
+          </fieldset>
+
           <div className="form-grid__full">
             <div className="inline-form">
+              <label>
+                Topic
+                <select
+                  value={suggestionTopic}
+                  onChange={(event) => setSuggestionTopic(event.target.value as DailyQuestionTopic)}
+                >
+                  {suggestionTopics.map((value) => (
+                    <option key={value} value={value}>
+                      {topicLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Difficulty
+                <select
+                  value={suggestionDifficulty}
+                  onChange={(event) =>
+                    setSuggestionDifficulty(event.target.value as DailyQuestionDifficulty)
+                  }
+                >
+                  {suggestionDifficulties.map((value) => (
+                    <option key={value} value={value}>
+                      {difficultyLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button type="button" onClick={() => void loadSuggestions()} disabled={loadingSuggestions}>
-                {loadingSuggestions ? "Loading suggestions..." : "Suggest from Islamic API"}
+                {loadingSuggestions ? "Loading..." : "Suggest"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSuggestions((prev) => !prev)}
+                disabled={suggestions.length === 0}
+              >
+                {showSuggestions ? "Hide suggestions" : "Show suggestions"}
+              </button>
+              <button
+                type="button"
+                onClick={closeSuggestions}
+                disabled={suggestions.length === 0}
+              >
+                Close
               </button>
               <small className="muted-text">
-                Arabic suggestions for selected answer type ({answerType})
+                Arabic Islamic suggestions ({answerType}) with filters.
               </small>
             </div>
-            {suggestions.length > 0 ? (
+            {showSuggestions && suggestions.length > 0 ? (
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Question</th>
+                      <th>Topic</th>
+                      <th>Difficulty</th>
                       <th>Correct</th>
                       <th>Source</th>
                       <th>Apply</th>
@@ -532,6 +736,8 @@ export function DailyQuestionsModule() {
                     {suggestions.map((suggestion, index) => (
                       <tr key={`${suggestion.source}-${index}`}>
                         <td>{suggestion.questionText}</td>
+                        <td>{topicLabel(suggestion.topic)}</td>
+                        <td>{difficultyLabel(suggestion.difficulty)}</td>
                         <td>{formatSuggestionAnswerPreview(suggestion)}</td>
                         <td>{suggestion.source}</td>
                         <td>

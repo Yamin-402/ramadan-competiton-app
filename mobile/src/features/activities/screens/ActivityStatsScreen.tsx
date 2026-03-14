@@ -11,6 +11,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { Activity } from "../../../types/domain";
 import { formatPoints } from "../../../utils/format";
+import { getRamadanDayNumber } from "../../../utils/ramadan";
 
 interface RankedValue {
   label: string;
@@ -42,14 +43,25 @@ function formatDateShort(dateKey: string): string {
   return `${parts[2]}/${parts[1]}`;
 }
 
+function formatDayLabel(dateKey: string, isArabic: boolean): string {
+  const normalized = dateKey.includes("T") ? dateKey : `${dateKey}T12:00:00.000Z`;
+  const ramadanDay = getRamadanDayNumber(new Date(normalized));
+  if (ramadanDay > 0) {
+    return isArabic ? `يوم ${ramadanDay}` : `Day ${ramadanDay}`;
+  }
+  return formatDateShort(dateKey);
+}
+
 function DailyPointsGraph({
   rows,
   colors,
   t,
+  isArabic,
 }: {
   rows: DailyPointBar[];
   colors: ReturnType<typeof useAppTheme>["colors"];
   t: ReturnType<typeof useI18n>["t"];
+  isArabic: boolean;
 }) {
   if (rows.length === 0) {
     return <Text style={{ color: colors.textSecondary }}>{t("activityStats.noDataShort")}</Text>;
@@ -62,10 +74,10 @@ function DailyPointsGraph({
       {rows.map((row) => {
         const heightPercent = Math.max((row.gained / maxGained) * 100, 6);
         return (
-          <View key={row.date} style={styles.dayBarWrap}>
-            <View style={[styles.barTrack, { backgroundColor: colors.cardSoft }]}>
-              <View
-                style={[
+            <View key={row.date} style={styles.dayBarWrap}>
+              <View style={[styles.barTrack, { backgroundColor: colors.cardSoft }]}>
+                <View
+                  style={[
                   styles.barFillVertical,
                   {
                     backgroundColor: colors.gold,
@@ -74,7 +86,9 @@ function DailyPointsGraph({
                 ]}
               />
             </View>
-            <Text style={[styles.dayBarLabel, { color: colors.textSecondary }]}>{formatDateShort(row.date)}</Text>
+            <Text style={[styles.dayBarLabel, { color: colors.textSecondary }]}>
+              {formatDayLabel(row.date, isArabic)}
+            </Text>
             <Text style={[styles.dayBarValue, { color: colors.textPrimary }]}>+{formatPoints(row.gained)}</Text>
           </View>
         );
@@ -273,7 +287,7 @@ export function ActivityStatsScreen() {
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               {t("activityStats.pointsTrend")}
             </Text>
-            <DailyPointsGraph rows={stats.pointsByDay} colors={colors} t={t} />
+            <DailyPointsGraph rows={stats.pointsByDay} colors={colors} t={t} isArabic={isArabic} />
           </AppCard>
 
           <AppCard>
@@ -377,4 +391,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-

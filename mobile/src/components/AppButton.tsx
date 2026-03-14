@@ -1,5 +1,6 @@
 import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 import { useAppTheme } from "../hooks/use-app-theme";
+import { useSettingsStore } from "../store/settings-store";
 
 type ButtonVariant = "primary" | "ghost" | "danger";
 
@@ -21,15 +22,17 @@ export function AppButton({
   labelColor,
 }: AppButtonProps) {
   const { colors } = useAppTheme();
+  const variantTheme = useSettingsStore((state) => state.tasksDesignVariant);
+  const isNightVariant = variantTheme === "ramadan_nights";
 
   const variantStyle = {
     primary: {
       backgroundColor: colors.gold,
       borderColor: colors.goldMuted,
-      textColor: "#1d1809",
+      textColor: isNightVariant ? "#251b06" : "#1d1809",
     },
     ghost: {
-      backgroundColor: "transparent",
+      backgroundColor: isNightVariant ? "rgba(242, 199, 90, 0.12)" : "transparent",
       borderColor: colors.border,
       textColor: colors.textPrimary,
     },

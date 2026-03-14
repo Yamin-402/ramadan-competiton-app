@@ -225,6 +225,12 @@ function getGuideGradient(
       : ["#f3ead2", "#e8d9af", "#d8c58f"];
   }
 
+  if (variant === "ramadan_nights") {
+    return mode === "dark"
+      ? ["#09071a", "#130d2d", "#1e1350"]
+      : ["#efe9ff", "#ddd0ff", "#c9b6ff"];
+  }
+
   if (variant === "modern") {
     return mode === "dark"
       ? ["#0f1723", "#162538", "#0f1f31"]

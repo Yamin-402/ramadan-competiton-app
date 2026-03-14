@@ -1,4 +1,5 @@
 import {
+  AiAssistSettings,
   AdminAccessUser,
   AdminCounter,
   AdminDailyQuestionAnswer,
@@ -6,9 +7,12 @@ import {
   AdminTaskCounterRule,
   AdminUserActivity,
   AdminUser,
+  DailyQuestionDifficulty,
   DailyQuestionSuggestion,
   DailyQuestionListItem,
+  DailyQuestionTopic,
   LeaderboardRow,
+  MotivationNotificationResult,
   NotificationCampaignListItem,
   ScoringSettings,
   TaskCreatePayload,
@@ -234,12 +238,26 @@ export const adminApi = {
 
   listDailyQuestionSuggestions(params: {
     answerType: "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
+    topic?: DailyQuestionTopic;
+    difficulty?: DailyQuestionDifficulty;
     limit?: number;
   }) {
     return requestData<DailyQuestionSuggestion[]>({
       method: "GET",
       url: "/admin/daily-questions/suggestions",
       params,
+    });
+  },
+
+  generateMotivationNotifications(payload?: {
+    lookbackDays?: number;
+    limitUsers?: number;
+    dryRun?: boolean;
+  }) {
+    return requestData<MotivationNotificationResult>({
+      method: "POST",
+      url: "/admin/notifications/motivation/generate",
+      data: payload || {},
     });
   },
 
@@ -357,6 +375,21 @@ export const adminApi = {
     return requestData<ScoringSettings>({
       method: "PATCH",
       url: "/admin/settings/scoring",
+      data: payload,
+    });
+  },
+
+  getAiAssistSettings() {
+    return requestData<AiAssistSettings>({
+      method: "GET",
+      url: "/admin/settings/ai-assist",
+    });
+  },
+
+  updateAiAssistSettings(payload: Partial<AiAssistSettings>) {
+    return requestData<AiAssistSettings>({
+      method: "PATCH",
+      url: "/admin/settings/ai-assist",
       data: payload,
     });
   },

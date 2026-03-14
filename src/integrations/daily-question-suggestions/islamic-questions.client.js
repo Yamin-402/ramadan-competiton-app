@@ -10,13 +10,15 @@ const DATASET_PROFILE = {
 const ARABIC_CHARS_REGEX = /[\u0600-\u06FF]/g;
 const HTML_TAG_REGEX = /<[^>]*>/g;
 const WHITESPACE_REGEX = /\s+/g;
-const LEADING_ANSWER_PREFIX_REGEX = /^(الجواب|الإجابة|الاجابة)\s*[:：-]\s*/i;
-const LEADING_PRAISE_PREFIX_REGEX = /^\s*الحمد\s+لله[.،:\s-]*/i;
+const LEADING_ANSWER_PREFIX_REGEX =
+  /^(?:\u0627\u0644\u062c\u0648\u0627\u0628|\u0627\u0644\u0625\u062c\u0627\u0628\u0629|\u0627\u0644\u0627\u062c\u0627\u0628\u0629)\s*[:\-]\s*/i;
+const LEADING_PRAISE_PREFIX_REGEX =
+  /^\s*\u0627\u0644\u062d\u0645\u062f\s+\u0644\u0644\u0647[.:\s\-]*/i;
 
 const MAX_FETCH_LENGTH = 100;
 const MAX_FETCH_ATTEMPTS = 5;
-const MAX_EXPLANATION_LENGTH = 950;
-const MAX_SHORT_ANSWER_LENGTH = 160;
+const MAX_EXPLANATION_LENGTH = 320;
+const MAX_SHORT_ANSWER_LENGTH = 140;
 const DATASET_SIZE_CACHE_TTL_MS = 1000 * 60 * 30;
 
 let cachedSplitSize = null;
@@ -50,7 +52,7 @@ function truncateText(value, maxLength) {
     return normalized;
   }
 
-  return `${normalized.slice(0, maxLength - 1).trim()}…`;
+  return `${normalized.slice(0, maxLength - 1).trim()}...`;
 }
 
 function decodeEntities(value) {
@@ -79,11 +81,7 @@ function textFromUnknown(value) {
   }
 
   if (Array.isArray(value)) {
-    const joined = value
-      .map((item) => textFromUnknown(item))
-      .filter(Boolean)
-      .join(" ");
-    return normalizeText(joined);
+    return normalizeText(value.map((item) => textFromUnknown(item)).filter(Boolean).join(" "));
   }
 
   if (!value || typeof value !== "object") {
@@ -166,11 +164,7 @@ function extractQuestionAnswerFromConversation(conversation) {
     }
   }
 
-  if (!question || !answer) {
-    return null;
-  }
-
-  return { question, answer };
+  return question && answer ? { question, answer } : null;
 }
 
 function extractQuestionAnswerFromFields(row) {
@@ -211,11 +205,7 @@ function extractQuestionAnswerFromFields(row) {
     }
   }
 
-  if (!question || !answer) {
-    return null;
-  }
-
-  return { question, answer };
+  return question && answer ? { question, answer } : null;
 }
 
 function toQuestionAnswerEntry(rawRow) {
@@ -243,18 +233,11 @@ function toQuestionAnswerEntry(rawRow) {
 
   const question = normalizeText(pair.question);
   const answer = normalizeText(pair.answer);
-  if (!question || !answer) {
+  if (!question || !answer || !looksArabic(question) || !looksArabic(answer)) {
     return null;
   }
 
-  if (!looksArabic(question) || !looksArabic(answer)) {
-    return null;
-  }
-
-  return {
-    question,
-    answer,
-  };
+  return { question, answer };
 }
 
 function toShortAnswer(value) {
@@ -265,15 +248,33 @@ function toShortAnswer(value) {
   }
 
   const segments = normalized
-    .split(/[.\n؟!]/)
+    .split(/[.\n\u061F!]/)
     .map((segment) => segment.trim())
     .filter(Boolean);
+
   if (segments.length === 0) {
     return truncateText(normalized, MAX_SHORT_ANSWER_LENGTH);
   }
 
   const firstMeaningful = segments.find((segment) => segment.length >= 12) || segments[0];
   return truncateText(firstMeaningful, MAX_SHORT_ANSWER_LENGTH);
+}
+
+function toShortExplanation(value) {
+  const normalized = normalizeText(value)
+    .replace(LEADING_ANSWER_PREFIX_REGEX, "")
+    .replace(LEADING_PRAISE_PREFIX_REGEX, "");
+  if (!normalized) {
+    return "";
+  }
+
+  const segments = normalized
+    .split(/[.\n\u061F!]/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length >= 10);
+
+  const firstTwo = segments.slice(0, 2).join(". ");
+  return truncateText(firstTwo || normalized, MAX_EXPLANATION_LENGTH);
 }
 
 function normalizeChoiceValue(value) {
@@ -300,23 +301,101 @@ function parseArabicBoolean(answerText) {
     return null;
   }
 
-  if (/^\s*نعم\b/.test(normalized)) {
+  if (/^\s*\u0646\u0639\u0645\b/.test(normalized)) {
     return true;
   }
 
-  if (/^\s*لا\b/.test(normalized)) {
+  if (/^\s*\u0644\u0627\b/.test(normalized)) {
     return false;
   }
 
-  if (/(^|\s)(يجوز|صحيح|مستحب|واجب|حلال)(\s|$)/.test(normalized) && !/(^|\s)(لا يجوز|غير جائز|حرام|خطأ)(\s|$)/.test(normalized)) {
+  if (
+    /(^|\s)(\u064a\u062c\u0648\u0632|\u0635\u062d\u064a\u062d|\u0645\u0633\u062a\u062d\u0628|\u0648\u0627\u062c\u0628|\u062d\u0644\u0627\u0644)(\s|$)/.test(normalized) &&
+    !/(^|\s)(\u0644\u0627 \u064a\u062c\u0648\u0632|\u063a\u064a\u0631 \u062c\u0627\u0626\u0632|\u062d\u0631\u0627\u0645|\u062e\u0637\u0623)(\s|$)/.test(normalized)
+  ) {
     return true;
   }
 
-  if (/(^|\s)(لا يجوز|غير جائز|حرام|خطأ)(\s|$)/.test(normalized)) {
+  if (
+    /(^|\s)(\u0644\u0627 \u064a\u062c\u0648\u0632|\u063a\u064a\u0631 \u062c\u0627\u0626\u0632|\u062d\u0631\u0627\u0645|\u062e\u0637\u0623)(\s|$)/.test(normalized)
+  ) {
     return false;
   }
 
   return null;
+}
+
+function inferTopic(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  if (!normalized) {
+    return "FIQH";
+  }
+
+  if (
+    /(\u0633\u0648\u0631\u0629|\u0622\u064a\u0629|\u0627\u064a\u0629|\u0627\u0644\u0642\u0631\u0622\u0646|\u0627\u0644\u0642\u0631\u0627\u0646|\u062a\u062c\u0648\u064a\u062f)/.test(
+      normalized
+    )
+  ) {
+    return "QURAN";
+  }
+
+  if (
+    /(\u062d\u062f\u064a\u062b|\u0627\u0644\u0628\u062e\u0627\u0631\u064a|\u0645\u0633\u0644\u0645|\u0633\u0646\u0646|\u0631\u0648\u0627\u0647)/.test(
+      normalized
+    )
+  ) {
+    return "HADITH";
+  }
+
+  if (
+    /(\u0633\u064a\u0631\u0629|\u0627\u0644\u0646\u0628\u064a|\u0627\u0644\u0635\u062d\u0627\u0628\u0629|\u063a\u0632\u0648\u0629)/.test(
+      normalized
+    )
+  ) {
+    return "SEERAH";
+  }
+
+  if (
+    /(\u0639\u0642\u064a\u062f\u0629|\u062a\u0648\u062d\u064a\u062f|\u0625\u064a\u0645\u0627\u0646|\u0627\u064a\u0645\u0627\u0646|\u0634\u0631\u0643)/.test(
+      normalized
+    )
+  ) {
+    return "AQEEDAH";
+  }
+
+  if (
+    /(\u0623\u062e\u0644\u0627\u0642|\u0627\u062e\u0644\u0627\u0642|\u0628\u0631|\u0635\u062f\u0642|\u0635\u0628\u0631|\u0631\u062d\u0645\u0629)/.test(
+      normalized
+    )
+  ) {
+    return "AKHLAQ";
+  }
+
+  return "FIQH";
+}
+
+function inferDifficulty(questionText, answerText) {
+  const questionLength = normalizeText(questionText).length;
+  const answerLength = normalizeText(answerText).length;
+  const combined = questionLength + answerLength;
+
+  if (combined <= 190) {
+    return "EASY";
+  }
+
+  if (combined <= 360) {
+    return "MEDIUM";
+  }
+
+  return "HARD";
+}
+
+function isMatchingTopic(topic, requestedTopic) {
+  return !requestedTopic || requestedTopic === "ANY" || topic === requestedTopic;
+}
+
+function isMatchingDifficulty(difficulty, requestedDifficulty) {
+  return !requestedDifficulty || requestedDifficulty === "ANY" || difficulty === requestedDifficulty;
 }
 
 async function fetchSplitSize(split) {
@@ -341,11 +420,7 @@ async function fetchSplitSize(split) {
       continue;
     }
     const key = String(row.split || "").trim();
-    const rows =
-      Number(row.num_rows) ||
-      Number(row.num_examples) ||
-      Number(row.rows) ||
-      0;
+    const rows = Number(row.num_rows) || Number(row.num_examples) || Number(row.rows) || 0;
     if (key && rows > 0) {
       splitSize[key] = rows;
     }
@@ -394,21 +469,46 @@ async function fetchArabicQuestionAnswerEntries(targetCount) {
   return uniqueByQuestion(collected);
 }
 
-function buildTextSuggestions(entries, limit) {
-  return entries.slice(0, limit).map((entry) => {
-    const shortAnswer = toShortAnswer(entry.answer);
-    return {
-      source: "islamqa_hf",
-      questionText: entry.question,
-      answerType: "TEXT",
-      correctAnswer: shortAnswer || truncateText(entry.answer, MAX_SHORT_ANSWER_LENGTH),
-      answerExplanation: truncateText(entry.answer, MAX_EXPLANATION_LENGTH),
-      options: null,
-    };
-  });
+function toSuggestionBase(entry, answerType) {
+  const topic = inferTopic(`${entry.question} ${entry.answer}`);
+  const difficulty = inferDifficulty(entry.question, entry.answer);
+
+  return {
+    source: "islamqa_hf",
+    questionText: truncateText(entry.question, 210),
+    answerType,
+    answerExplanation: toShortExplanation(entry.answer),
+    topic,
+    difficulty,
+  };
 }
 
-function buildChoiceSuggestions(entries, answerType, limit) {
+function buildTextSuggestions(entries, limit, requestedTopic, requestedDifficulty) {
+  const suggestions = [];
+  for (const entry of entries) {
+    if (suggestions.length >= limit) {
+      break;
+    }
+
+    const base = toSuggestionBase(entry, "TEXT");
+    if (
+      !isMatchingTopic(base.topic, requestedTopic) ||
+      !isMatchingDifficulty(base.difficulty, requestedDifficulty)
+    ) {
+      continue;
+    }
+
+    suggestions.push({
+      ...base,
+      correctAnswer: toShortAnswer(entry.answer) || truncateText(entry.answer, MAX_SHORT_ANSWER_LENGTH),
+      options: null,
+    });
+  }
+
+  return suggestions;
+}
+
+function buildChoiceSuggestions(entries, answerType, limit, requestedTopic, requestedDifficulty) {
   const answerPool = Array.from(
     new Set(
       entries
@@ -422,6 +522,14 @@ function buildChoiceSuggestions(entries, answerType, limit) {
   for (const entry of entries) {
     if (suggestions.length >= limit) {
       break;
+    }
+
+    const base = toSuggestionBase(entry, answerType);
+    if (
+      !isMatchingTopic(base.topic, requestedTopic) ||
+      !isMatchingDifficulty(base.difficulty, requestedDifficulty)
+    ) {
+      continue;
     }
 
     const correctOption = truncateText(toShortAnswer(entry.answer), MAX_SHORT_ANSWER_LENGTH);
@@ -439,23 +547,28 @@ function buildChoiceSuggestions(entries, answerType, limit) {
 
     const options = shuffle([correctOption, ...distractors]);
     suggestions.push({
-      source: "islamqa_hf",
-      questionText: entry.question,
-      answerType,
+      ...base,
       options,
       correctAnswer: answerType === "MULTIPLE_CHOICE" ? [correctOption] : correctOption,
-      answerExplanation: truncateText(entry.answer, MAX_EXPLANATION_LENGTH),
     });
   }
 
   return suggestions;
 }
 
-function buildBooleanSuggestions(entries, limit) {
+function buildBooleanSuggestions(entries, limit, requestedTopic, requestedDifficulty) {
   const suggestions = [];
   for (const entry of entries) {
     if (suggestions.length >= limit) {
       break;
+    }
+
+    const base = toSuggestionBase(entry, "BOOLEAN");
+    if (
+      !isMatchingTopic(base.topic, requestedTopic) ||
+      !isMatchingDifficulty(base.difficulty, requestedDifficulty)
+    ) {
+      continue;
     }
 
     const value = parseArabicBoolean(entry.answer);
@@ -464,37 +577,117 @@ function buildBooleanSuggestions(entries, limit) {
     }
 
     suggestions.push({
-      source: "islamqa_hf",
-      questionText: entry.question,
-      answerType: "BOOLEAN",
-      options: ["نعم", "لا"],
+      ...base,
+      options: ["\u0646\u0639\u0645", "\u0644\u0627"],
       correctAnswer: value,
-      answerExplanation: truncateText(entry.answer, MAX_EXPLANATION_LENGTH),
     });
   }
 
   return suggestions;
 }
 
-export async function fetchIslamicDailyQuestionSuggestions(answerType, limit) {
+function buildSuggestionsByType(
+  answerType,
+  entries,
+  limit,
+  requestedTopic,
+  requestedDifficulty
+) {
+  if (answerType === "TEXT") {
+    return buildTextSuggestions(entries, limit, requestedTopic, requestedDifficulty);
+  }
+
+  if (answerType === "BOOLEAN") {
+    return buildBooleanSuggestions(entries, limit, requestedTopic, requestedDifficulty);
+  }
+
+  if (answerType === "SINGLE_CHOICE" || answerType === "MULTIPLE_CHOICE") {
+    return buildChoiceSuggestions(
+      entries,
+      answerType,
+      limit,
+      requestedTopic,
+      requestedDifficulty
+    );
+  }
+
+  return [];
+}
+
+function appendUniqueSuggestions(current, candidates, limit) {
+  for (const candidate of candidates) {
+    if (current.length >= limit) {
+      break;
+    }
+
+    const key = `${candidate.answerType}|${normalizeChoiceValue(candidate.questionText)}`;
+    const exists = current.some(
+      (existing) =>
+        `${existing.answerType}|${normalizeChoiceValue(existing.questionText)}` === key
+    );
+    if (!exists) {
+      current.push(candidate);
+    }
+  }
+}
+
+export async function fetchIslamicDailyQuestionSuggestions(answerType, limit, topic, difficulty) {
   const safeLimit = Math.max(1, Math.min(10, Number(limit) || 5));
-  const targetPoolSize = Math.max(40, safeLimit * 12);
+  const targetPoolSize = Math.max(40, safeLimit * 14);
   const entries = await fetchArabicQuestionAnswerEntries(targetPoolSize);
   if (entries.length === 0) {
     return [];
   }
 
-  if (answerType === "TEXT") {
-    return buildTextSuggestions(shuffle(entries), safeLimit);
+  const shuffledEntries = shuffle(entries);
+  const requestedTopic = topic || "ANY";
+  const requestedDifficulty = difficulty || "ANY";
+  const result = [];
+
+  const strict = buildSuggestionsByType(
+    answerType,
+    shuffledEntries,
+    safeLimit,
+    requestedTopic,
+    requestedDifficulty
+  );
+  appendUniqueSuggestions(result, strict, safeLimit);
+
+  if (result.length < safeLimit && requestedDifficulty !== "ANY") {
+    const relaxedDifficulty = buildSuggestionsByType(
+      answerType,
+      shuffledEntries,
+      safeLimit,
+      requestedTopic,
+      "ANY"
+    );
+    appendUniqueSuggestions(result, relaxedDifficulty, safeLimit);
   }
 
-  if (answerType === "BOOLEAN") {
-    return buildBooleanSuggestions(shuffle(entries), safeLimit);
+  if (result.length < safeLimit && requestedTopic !== "ANY") {
+    const relaxedTopic = buildSuggestionsByType(
+      answerType,
+      shuffledEntries,
+      safeLimit,
+      "ANY",
+      requestedDifficulty
+    );
+    appendUniqueSuggestions(result, relaxedTopic, safeLimit);
   }
 
-  if (answerType === "SINGLE_CHOICE" || answerType === "MULTIPLE_CHOICE") {
-    return buildChoiceSuggestions(shuffle(entries), answerType, safeLimit);
+  if (
+    result.length < safeLimit &&
+    (requestedTopic !== "ANY" || requestedDifficulty !== "ANY")
+  ) {
+    const fullyRelaxed = buildSuggestionsByType(
+      answerType,
+      shuffledEntries,
+      safeLimit,
+      "ANY",
+      "ANY"
+    );
+    appendUniqueSuggestions(result, fullyRelaxed, safeLimit);
   }
 
-  return [];
+  return result.slice(0, safeLimit);
 }

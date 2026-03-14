@@ -1,5 +1,6 @@
 import { Theme } from "@react-navigation/native";
-import { AppColors, darkColors, lightColors } from "./colors";
+import { TasksDesignVariant } from "../store/settings-store";
+import { AppColors, darkColors, lightColors, nightColors } from "./colors";
 
 export type ResolvedThemeMode = "light" | "dark";
 
@@ -23,8 +24,12 @@ function buildNavigationTheme(mode: ResolvedThemeMode, colors: AppColors): Theme
   };
 }
 
-export function createAppTheme(mode: ResolvedThemeMode): AppTheme {
-  const colors = mode === "dark" ? darkColors : lightColors;
+export function createAppTheme(
+  mode: ResolvedThemeMode,
+  variant: TasksDesignVariant = "classic"
+): AppTheme {
+  const colors =
+    variant === "ramadan_nights" ? nightColors : mode === "dark" ? darkColors : lightColors;
 
   return {
     mode,

@@ -21,6 +21,8 @@
     "expo-asset": "~12.0.12",
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
+    "expo-print": "~15.0.7",
+    "expo-sharing": "~14.0.7",
     "expo-status-bar": "~3.0.9",
     "ramadan-express-prisma": "file:..",
     "react": "19.1.0",

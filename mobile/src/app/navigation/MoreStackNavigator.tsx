@@ -8,6 +8,7 @@ import { MoreMenuScreen } from "../../features/more/screens/MoreMenuScreen";
 import { NotificationsScreen } from "../../features/notifications/screens/NotificationsScreen";
 import { OnboardingGuideScreen } from "../../features/onboarding/screens/OnboardingGuideScreen";
 import { ProfileScreen } from "../../features/profile/screens/ProfileScreen";
+import { AiReportScreen } from "../../features/reports/screens/AiReportScreen";
 import { UserProfileScreen } from "../../features/profile/screens/UserProfileScreen";
 import { StreaksScreen } from "../../features/streaks/screens/StreaksScreen";
 import { MoreHeaderStatus } from "../../components/MoreHeaderStatus";
@@ -64,6 +65,7 @@ export function MoreStackNavigator() {
       />
       <Stack.Screen name="Money" component={MoneyScreen} options={{ title: t("more.money") }} />
       <Stack.Screen name="ActivityStats" component={ActivityStatsScreen} options={{ title: t("more.stats") }} />
+      <Stack.Screen name="AiReport" component={AiReportScreen} options={{ title: t("more.aiReport") }} />
       <Stack.Screen
         name="ActivityHistory"
         component={ActivityHistoryScreen}

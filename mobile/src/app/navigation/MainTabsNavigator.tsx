@@ -28,7 +28,7 @@ export function MainTabsNavigator() {
   const insets = useSafeAreaInsets();
   const variant = useSettingsStore((state) => state.tasksDesignVariant);
   const palette = getLayoutPalette(variant, colors, mode);
-  const tabBarBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 14 : 8);
+  const tabBarBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 16 : 8);
   const tabBarHeight = 56 + tabBarBottomInset;
 
   return (

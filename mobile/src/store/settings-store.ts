@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { createStorage } from "../utils/web-storage";
 
 export type ThemePreference = "system" | "light" | "dark";
-export type TasksDesignVariant = "classic" | "ramadan_modern" | "modern";
+export type TasksDesignVariant = "classic" | "ramadan_modern" | "ramadan_nights" | "modern";
 export type AppLanguage = "en" | "ar";
 
 interface SettingsState {
@@ -24,7 +24,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       themePreference: "system",
-      tasksDesignVariant: "classic",
+      tasksDesignVariant: "ramadan_nights",
       appLanguage: "en",
       onboardingSeenByUserId: {},
       hydrated: false,

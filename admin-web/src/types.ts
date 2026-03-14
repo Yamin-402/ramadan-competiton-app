@@ -6,6 +6,15 @@ export type ConditionType = "TASK_COMPLETIONS" | "COUNTER_TOTAL" | "STREAK_DAYS"
 export type ConditionOperator = "EQ" | "NEQ" | "GT" | "GTE" | "LT" | "LTE";
 export type NotificationTargetType = "ALL_USERS" | "TAGS" | "USER_IDS";
 export type DailyQuestionType = "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
+export type DailyQuestionTopic =
+  | "ANY"
+  | "FIQH"
+  | "HADITH"
+  | "QURAN"
+  | "AQEEDAH"
+  | "SEERAH"
+  | "AKHLAQ";
+export type DailyQuestionDifficulty = "ANY" | "EASY" | "MEDIUM" | "HARD";
 
 export interface AdminSessionUser {
   id: number;
@@ -147,6 +156,13 @@ export interface ScoringSettings {
   applyDuring: "FASTING" | "IFTAR";
 }
 
+export interface AiAssistSettings {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  timeoutMs: number;
+}
+
 export interface DailyQuestionListItem {
   id: number;
   questionText: string;
@@ -169,6 +185,36 @@ export interface DailyQuestionSuggestion {
   options: unknown;
   correctAnswer: unknown;
   answerExplanation?: string | null;
+  topic?: Exclude<DailyQuestionTopic, "ANY"> | null;
+  difficulty?: Exclude<DailyQuestionDifficulty, "ANY"> | null;
+}
+
+export interface MotivationNotificationReportRow {
+  userId: number;
+  displayName: string | null;
+  email: string;
+  summary: string;
+  title: string;
+  body: string;
+  stats: {
+    lookbackDays: number;
+    totalTasks: number;
+    totalPoints: number;
+    activeDays: number;
+    inactiveDays: number;
+    bestWeekday: string | null;
+    weakestWeekday: string | null;
+    bestDate: string | null;
+    weakestDate: string | null;
+  };
+}
+
+export interface MotivationNotificationResult {
+  generatedAt: string;
+  usersAnalyzed: number;
+  notificationsCreated: number;
+  dryRun: boolean;
+  reports: MotivationNotificationReportRow[];
 }
 
 export interface LeaderboardRow {

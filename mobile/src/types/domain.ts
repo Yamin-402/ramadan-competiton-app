@@ -231,3 +231,77 @@ export interface PublicUserProfile {
     longestStreak: number;
   } | null;
 }
+
+export interface AiUserReport {
+  generatedAt: string;
+  options: {
+    lookbackDays: number;
+    reportLength: "SHORT" | "MEDIUM" | "LONG";
+    focusMode: "SUMMARY" | "COMPARISON" | "BOTH";
+    language: "AR" | "EN";
+    tone: "MOTIVATIONAL" | "BALANCED" | "STRICT";
+    includeDailyQuestions: boolean;
+    includeTiming: boolean;
+    includeTopTasks: boolean;
+    includeStreaks: boolean;
+  };
+  report: {
+    title: string;
+    summary: string;
+    highlights: string[];
+    comparison: string;
+    actionPlan: string[];
+    motivation: string;
+    usedAi: boolean;
+  };
+  analytics: {
+    totals: {
+      lookbackDays: number;
+      totalActivities: number;
+      totalPoints: number;
+      taskCompletionCount: number;
+      manualAdjustmentCount: number;
+      activeDays: number;
+      inactiveDays: number;
+      averagePointsPerActiveDay: number;
+    };
+    timing: {
+      fastingCount: number;
+      iftarCount: number;
+    };
+    dailyQuestions: {
+      answered: number;
+      correct: number;
+      accuracy: number;
+    };
+    streaks: {
+      activeStreaks: number;
+      bestCurrentStreak: number;
+      longestStreak: number;
+    };
+    comparison: {
+      firstHalfAveragePoints: number;
+      secondHalfAveragePoints: number;
+      trendDelta: number;
+      bestDay: {
+        dayKey: string;
+        points: number;
+        count: number;
+      } | null;
+      weakestDay: {
+        dayKey: string;
+        points: number;
+        count: number;
+      } | null;
+    };
+    topTasks: Array<{
+      taskTitle: string;
+      count: number;
+    }>;
+    weekdayDistribution: Array<{
+      weekday: string;
+      count: number;
+    }>;
+    forbiddenCount: number;
+  };
+}

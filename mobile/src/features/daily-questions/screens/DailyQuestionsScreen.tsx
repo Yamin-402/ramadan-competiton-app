@@ -14,6 +14,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
 import { DailyQuestion, DailyQuestionHistoryItem } from "../../../types/domain";
+import { escapeHtml, exportPdfFromHtml } from "../../../utils/pdf-export";
 import { formatPoints } from "../../../utils/format";
 import { normalizeQuestionOptions } from "../../../utils/question";
 import { getRamadanDayNumber } from "../../../utils/ramadan";
@@ -102,18 +103,56 @@ function formatAnswerForDisplay(answer: unknown, t: ReturnType<typeof useI18n>["
   return String(normalized);
 }
 
+function buildDailyPdfStyles(direction: "rtl" | "ltr") {
+  return `
+  <style>
+    body {
+      font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Arial Unicode MS", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
+      direction: ${direction};
+      margin: 24px;
+      color: #16181d;
+      background: #ffffff;
+      line-height: 1.4;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    h2 { margin: 20px 0 8px; font-size: 16px; color: #2d2f38; }
+    .subtitle { color: #5b6070; margin-bottom: 14px; font-size: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+    thead th {
+      background: #f3f6fc;
+      border: 1px solid #d6deea;
+      padding: 6px;
+    }
+    tbody td {
+      border: 1px solid #d6deea;
+      padding: 6px;
+      vertical-align: top;
+    }
+  </style>
+`;
+}
+
 export function DailyQuestionsScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const textAlign = isArabic ? "right" : "left";
-  const isRamadanVariant = tasksDesignVariant === "ramadan_modern";
+  const isRamadanVariant =
+    tasksDesignVariant === "ramadan_modern" || tasksDesignVariant === "ramadan_nights";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const isModernVariant = tasksDesignVariant === "modern";
 
   const [todayQuestion, setTodayQuestion] = useState<DailyQuestion | null>(null);
   const [history, setHistory] = useState<DailyQuestionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedHistoryByDay, setExpandedHistoryByDay] = useState<Record<string, boolean>>({});
 
@@ -295,6 +334,118 @@ export function DailyQuestionsScreen() {
     }));
   };
 
+  const handleExportHistory = async (language: "ar" | "en") => {
+    setExporting(true);
+    setError(null);
+    try {
+      const isAr = language === "ar";
+      const labels = isAr
+        ? {
+            title: "سجل الأسئلة اليومية",
+            generatedAt: "تاريخ التصدير",
+            dayPrefix: "اليوم",
+            daySuffix: "من رمضان",
+            question: "السؤال",
+            status: "الحالة",
+            yourAnswer: "إجابتك",
+            correctAnswer: "الإجابة الصحيحة",
+            explanation: "التفسير",
+            points: "النقاط",
+            notAnswered: "لم يتم الإجابة",
+            revealLater: "يظهر بعد الفجر",
+          }
+        : {
+            title: "Daily Questions History",
+            generatedAt: "Export date",
+            dayPrefix: "Day",
+            daySuffix: "of Ramadan",
+            question: "Question",
+            status: "Status",
+            yourAnswer: "Your answer",
+            correctAnswer: "Correct answer",
+            explanation: "Explanation",
+            points: "Points",
+            notAnswered: "Not answered",
+            revealLater: "Reveals after Fajr",
+          };
+
+      const sectionsHtml = groupedHistory
+        .map((group) => {
+          const dayLabel = `${labels.dayPrefix} ${group.ramadanDay} ${labels.daySuffix}`;
+          const rowsHtml = group.items
+            .map((item) => {
+              const statusLabel = getHistoryStatusLabel(item, t);
+              const yourAnswer = item.didAnswer
+                ? formatAnswerForDisplay(item.answer, t)
+                : labels.notAnswered;
+              const correctAnswer =
+                item.status === "revealed"
+                  ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
+                  : labels.revealLater;
+              const explanation =
+                item.status === "revealed"
+                  ? extractAnswerExplanation(item.questionCorrectAnswer) || "-"
+                  : labels.revealLater;
+
+              return `
+                <tr>
+                  <td>${escapeHtml(item.question.questionText)}</td>
+                  <td>${escapeHtml(statusLabel)}</td>
+                  <td>${escapeHtml(yourAnswer)}</td>
+                  <td>${escapeHtml(correctAnswer)}</td>
+                  <td>${escapeHtml(explanation)}</td>
+                  <td>${escapeHtml(formatPoints(item.awardedPoints))}</td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          return `
+            <section>
+              <h2>${escapeHtml(dayLabel)}</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>${escapeHtml(labels.question)}</th>
+                    <th>${escapeHtml(labels.status)}</th>
+                    <th>${escapeHtml(labels.yourAnswer)}</th>
+                    <th>${escapeHtml(labels.correctAnswer)}</th>
+                    <th>${escapeHtml(labels.explanation)}</th>
+                    <th>${escapeHtml(labels.points)}</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </section>
+          `;
+        })
+        .join("");
+
+      const html = `
+        <html lang="${isAr ? "ar" : "en"}">
+          <head>
+            <meta charset="utf-8" />
+            ${buildDailyPdfStyles(isAr ? "rtl" : "ltr")}
+          </head>
+          <body>
+            <h1>${escapeHtml(labels.title)}</h1>
+            <div class="subtitle">${escapeHtml(labels.generatedAt)}: ${escapeHtml(new Date().toLocaleString())}</div>
+            ${sectionsHtml}
+          </body>
+        </html>
+      `;
+
+      await exportPdfFromHtml({
+        fileName: `daily_questions_${language}_${new Date().toISOString().slice(0, 10)}`,
+        html,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not export daily history"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderAnswerInput = () => {
     if (!todayQuestion || todayAnswer) {
       return null;
@@ -392,7 +543,7 @@ export function DailyQuestionsScreen() {
     <ScreenContainer>
       {isRamadanVariant ? (
         <LinearGradient
-          colors={["#0f3e2c", "#14543b", "#b79342"]}
+          colors={isNightVariant ? ["#120b2f", "#20124f", "#3c1f7a"] : ["#0f3e2c", "#14543b", "#b79342"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.ramadanHero}
@@ -421,6 +572,8 @@ export function DailyQuestionsScreen() {
             style={
               isModernVariant
                 ? { borderColor: "#d7dfec", backgroundColor: "#f8fbff" }
+                : isNightVariant
+                  ? { borderColor: "#5d4a8f", backgroundColor: "#1c1542" }
                 : isRamadanVariant
                   ? { borderColor: "#ceb983", backgroundColor: "#fff8e7" }
                   : undefined
@@ -511,6 +664,38 @@ export function DailyQuestionsScreen() {
           </AppCard>
 
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>{t("daily.history")}</Text>
+          <View style={styles.exportRow}>
+            <AppButton
+              label={
+                exporting
+                  ? isArabic
+                    ? "جاري التصدير..."
+                    : "Exporting..."
+                  : isArabic
+                    ? "تصدير PDF (عربي)"
+                    : "Export PDF (Arabic)"
+              }
+              variant="ghost"
+              onPress={() => void handleExportHistory("ar")}
+              disabled={groupedHistory.length === 0 || exporting}
+              style={styles.exportButton}
+            />
+            <AppButton
+              label={
+                exporting
+                  ? isArabic
+                    ? "جاري التصدير..."
+                    : "Exporting..."
+                  : isArabic
+                    ? "تصدير PDF (إنجليزي)"
+                    : "Export PDF (English)"
+              }
+              variant="ghost"
+              onPress={() => void handleExportHistory("en")}
+              disabled={groupedHistory.length === 0 || exporting}
+              style={styles.exportButton}
+            />
+          </View>
           {groupedHistory.length === 0 ? (
             <EmptyState title={t("daily.noHistoryTitle")} subtitle={t("daily.noHistorySubtitle")} />
           ) : (
@@ -522,6 +707,8 @@ export function DailyQuestionsScreen() {
                   style={
                     isModernVariant
                       ? { borderColor: "#d7dfec", backgroundColor: "#f8fbff" }
+                      : isNightVariant
+                        ? { borderColor: "#5d4a8f", backgroundColor: "#1c1542" }
                       : isRamadanVariant
                         ? { borderColor: "#ceb983", backgroundColor: "#fff8e7" }
                         : undefined
@@ -727,6 +914,13 @@ const styles = StyleSheet.create({
   },
   optionsList: {
     gap: 8,
+  },
+  exportRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  exportButton: {
+    flex: 1,
   },
   optionRow: {
     borderWidth: 1,

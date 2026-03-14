@@ -9,3 +9,11 @@ finally, in the top nav ( which contains the notification bell) add the user poi
 ------
 
 dude, chill, every variant means to change everything, even the background, please retry, put keep other changes you made, i liked it in some variants and another
+
+look, the theme looks good, but the cards and other elments need adjustments, as the cards look like the normal theme in color and shape, which break the constraint ( or whaterver it's called),edit it in all user pages, and make the text colour clear not hidden by the background, and make it the default theme until the end of ramadan.
+and make the export to .pdf with organized shape and in arabic too ( optinal for user to choose either arabic or english). and i didn't find any option for the ai in the user pages, to create the report or whatever, where did you put it ?
+
+in the stats page, make the days represented in ramdan days not normal celender, and fix the arabic version of the export pdf dor both tasks and questions, it shows "?" in most text instead of a real text, and add the explantion for the daily questions too.
+put the export feature clear the this is an exporting, not just " pdf en/ ed an " which is not clear for the users of its use. 
+
+add a new page for the user in more to ask the ai to produce a report, and add many features to add for the user in the report or whatever, and let the user choose the report length and either it should focus on summarizing or comapring or both, and other additanol options

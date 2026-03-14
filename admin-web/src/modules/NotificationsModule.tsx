@@ -2,7 +2,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { adminApi } from "../api/admin-api";
 import { toApiErrorMessage } from "../api/http";
 import { PanelCard } from "../components/PanelCard";
-import { AdminUser, NotificationCampaignListItem, NotificationTargetType, Tag } from "../types";
+import {
+  AdminUser,
+  MotivationNotificationReportRow,
+  NotificationCampaignListItem,
+  NotificationTargetType,
+  Tag,
+} from "../types";
 
 interface NotificationsModuleProps {
   tags: Tag[];
@@ -27,6 +33,11 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingCampaignId, setDeletingCampaignId] = useState<number | null>(null);
+  const [generatingMotivation, setGeneratingMotivation] = useState(false);
+  const [motivationLookbackDays, setMotivationLookbackDays] = useState("14");
+  const [motivationLimitUsers, setMotivationLimitUsers] = useState("80");
+  const [motivationReports, setMotivationReports] = useState<MotivationNotificationReportRow[]>([]);
+  const [motivationDryRun, setMotivationDryRun] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -99,8 +110,114 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
     }
   };
 
+  const runMotivationGenerator = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setGeneratingMotivation(true);
+
+    try {
+      const lookbackDays = Number(motivationLookbackDays);
+      const limitUsers = Number(motivationLimitUsers);
+      if (!Number.isInteger(lookbackDays) || lookbackDays < 3) {
+        throw new Error("Lookback days must be at least 3.");
+      }
+      if (!Number.isInteger(limitUsers) || limitUsers < 1) {
+        throw new Error("Users limit must be at least 1.");
+      }
+
+      const result = await adminApi.generateMotivationNotifications({
+        lookbackDays,
+        limitUsers,
+        dryRun: motivationDryRun,
+      });
+
+      setMotivationReports(result.reports);
+      if (result.dryRun) {
+        setSuccess(`Generated ${result.reports.length} motivation report(s).`);
+      } else {
+        setSuccess(
+          `Generated ${result.reports.length} report(s) and created ${result.notificationsCreated} notification(s).`
+        );
+        await loadCampaigns();
+      }
+    } catch (err) {
+      setError(toApiErrorMessage(err, "Could not generate motivation reports"));
+    } finally {
+      setGeneratingMotivation(false);
+    }
+  };
+
   return (
     <div className="stack">
+      <PanelCard title="AI Motivation Reports">
+        <form className="form-grid" onSubmit={runMotivationGenerator}>
+          <label>
+            Lookback days
+            <input
+              type="number"
+              min={3}
+              max={90}
+              value={motivationLookbackDays}
+              onChange={(event) => setMotivationLookbackDays(event.target.value)}
+            />
+          </label>
+          <label>
+            Users limit
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={motivationLimitUsers}
+              onChange={(event) => setMotivationLimitUsers(event.target.value)}
+            />
+          </label>
+          <label className="checkbox-label form-grid__full">
+            <input
+              type="checkbox"
+              checked={motivationDryRun}
+              onChange={(event) => setMotivationDryRun(event.target.checked)}
+            />
+            Dry run (generate reports only, no notifications)
+          </label>
+
+          <div className="form-grid__full inline-form">
+            <button type="submit" disabled={generatingMotivation}>
+              {generatingMotivation
+                ? "Generating..."
+                : motivationDryRun
+                  ? "Generate reports"
+                  : "Generate + send notifications"}
+            </button>
+          </div>
+        </form>
+
+        {motivationReports.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Summary</th>
+                  <th>Notification title</th>
+                  <th>Notification body</th>
+                </tr>
+              </thead>
+              <tbody>
+                {motivationReports.map((report) => (
+                  <tr key={report.userId}>
+                    <td>{report.displayName || report.email}</td>
+                    <td>{report.summary}</td>
+                    <td>{report.title}</td>
+                    <td>{report.body}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </PanelCard>
+
       <PanelCard title="Create Notification Campaign" actions={<button onClick={() => void loadCampaigns()}>Refresh</button>}>
         <form className="form-grid" onSubmit={submit}>
           <label>

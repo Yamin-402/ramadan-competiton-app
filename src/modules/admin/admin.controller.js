@@ -9,6 +9,7 @@ import {
   createTaskSchema,
   dailyQuestionAnswerParamsSchema,
   dailyQuestionParamsSchema,
+  generateMotivationNotificationsSchema,
   leaderboardVisibilitySchema,
   listAdminCountersQuerySchema,
   listAdminUserActivitiesQuerySchema,
@@ -23,6 +24,7 @@ import {
   reviewDailyQuestionAnswerSchema,
   taskParamsSchema,
   taskCounterRuleParamsSchema,
+  updateAiAssistSettingsSchema,
   updateAdminAccessSchema,
   updateScoringSettingsSchema,
   updateDailyQuestionSchema,
@@ -161,6 +163,13 @@ export async function deleteNotificationCampaign(req, res) {
   res.status(200).json({ data });
 }
 
+export async function generateMotivationNotifications(req, res) {
+  const payload = generateMotivationNotificationsSchema.parse(req.body || {});
+  const data = await adminService.generateMotivationNotifications(req.auth, payload);
+
+  res.status(200).json({ data });
+}
+
 export async function createDailyQuestion(req, res) {
   const payload = createDailyQuestionSchema.parse(req.body);
   const data = await adminService.createDailyQuestion(req.auth, payload);
@@ -254,6 +263,19 @@ export async function getScoringSettings(req, res) {
 export async function updateScoringSettings(req, res) {
   const payload = updateScoringSettingsSchema.parse(req.body);
   const data = await adminService.updateScoringSettings(req.auth, payload);
+
+  res.status(200).json({ data });
+}
+
+export async function getAiAssistSettings(req, res) {
+  const data = await adminService.getAiAssistSettings(req.auth);
+
+  res.status(200).json({ data });
+}
+
+export async function updateAiAssistSettings(req, res) {
+  const payload = updateAiAssistSettingsSchema.parse(req.body || {});
+  const data = await adminService.updateAiAssistSettings(req.auth, payload);
 
   res.status(200).json({ data });
 }

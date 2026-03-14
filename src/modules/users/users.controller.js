@@ -1,4 +1,5 @@
 import {
+  generateMyAiReportSchema,
   publicProfileParamsSchema,
   updateMyProfileSchema,
   updateMyTagsSchema,
@@ -27,6 +28,13 @@ export async function updateMyProfile(req, res) {
 export async function getPublicProfile(req, res) {
   const { id } = publicProfileParamsSchema.parse(req.params);
   const data = await usersService.getPublicProfile(req.auth, id);
+
+  res.status(200).json({ data });
+}
+
+export async function generateMyAiReport(req, res) {
+  const payload = generateMyAiReportSchema.parse(req.body || {});
+  const data = await usersService.generateMyAiReport(req.auth, payload);
 
   res.status(200).json({ data });
 }

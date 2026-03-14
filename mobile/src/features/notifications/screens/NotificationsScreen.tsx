@@ -59,9 +59,13 @@ export function NotificationsScreen() {
   };
 
   const isModernVariant = tasksDesignVariant === "modern";
-  const isRamadanVariant = tasksDesignVariant === "ramadan_modern";
+  const isRamadanVariant =
+    tasksDesignVariant === "ramadan_modern" || tasksDesignVariant === "ramadan_nights";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const variantCardStyle = isModernVariant
     ? { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
+    : isNightVariant
+      ? { backgroundColor: "#1c1642", borderColor: "#5d4a8f" }
     : isRamadanVariant
       ? { backgroundColor: "#fff8e7", borderColor: "#ceb983" }
       : undefined;

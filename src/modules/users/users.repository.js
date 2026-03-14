@@ -35,6 +35,70 @@ export const usersRepository = {
     });
   },
 
+  getAppSetting(key) {
+    return prisma.appSetting.findUnique({
+      where: { key },
+    });
+  },
+
+  listActivitiesForReport(userId, fromDate) {
+    return prisma.activity.findMany({
+      where: {
+        userId,
+        occurredAt: {
+          gte: fromDate,
+        },
+        type: {
+          in: ["TASK_COMPLETION", "DAILY_QUESTION_ANSWER", "MANUAL_ADJUSTMENT"],
+        },
+      },
+      orderBy: {
+        occurredAt: "asc",
+      },
+      select: {
+        id: true,
+        type: true,
+        occurredAt: true,
+        competitionDate: true,
+        effectivePoints: true,
+        isDuringFasting: true,
+        isForbidden: true,
+        note: true,
+        metadata: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+          },
+        },
+        counterDeltas: {
+          select: {
+            delta: true,
+            counter: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  },
+
+  listStreaksForUser(userId) {
+    return prisma.streak.findMany({
+      where: { userId },
+      select: {
+        taskId: true,
+        currentStreak: true,
+        longestStreak: true,
+      },
+    });
+  },
+
   async replaceUserTags(userId, tagIds) {
     return prisma.$transaction(async (tx) => {
       await tx.userTag.deleteMany({ where: { userId } });

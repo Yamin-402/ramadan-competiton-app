@@ -5,10 +5,11 @@ import { createAppTheme, ResolvedThemeMode } from "../theme";
 
 export function useAppTheme() {
   const preference = useSettingsStore((state) => state.themePreference);
+  const variant = useSettingsStore((state) => state.tasksDesignVariant);
   const system = useColorScheme();
 
   const mode: ResolvedThemeMode =
     preference === "system" ? (system === "dark" ? "dark" : "light") : preference;
 
-  return useMemo(() => createAppTheme(mode), [mode]);
+  return useMemo(() => createAppTheme(mode, variant), [mode, variant]);
 }

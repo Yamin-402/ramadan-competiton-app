@@ -26,6 +26,17 @@ export function getLayoutPalette(
     };
   }
 
+  if (variant === "ramadan_nights") {
+    return {
+      topNavBackground: mode === "dark" ? "#120c2a" : "#1e1642",
+      topNavText: "#dfd0ff",
+      bottomNavBackground: mode === "dark" ? "#0f0924" : "#17103a",
+      bottomNavBorder: mode === "dark" ? "#342a63" : "#3c3170",
+      tabActive: "#f2c75a",
+      tabInactive: mode === "dark" ? "#9d93c9" : "#b5acd9",
+    };
+  }
+
   if (variant === "modern") {
     return {
       topNavBackground: mode === "dark" ? "#162232" : "#f6f8fc",

@@ -21,25 +21,31 @@ export function MoreMenuScreen({ navigation }: Props) {
   const menu = [
     { route: "Guide", label: t("more.guide"), icon: "help-circle-outline" },
     { route: "Leaderboard", label: t("more.leaderboard"), icon: "trophy-outline" },
-   { route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
+    { route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
     { route: "Notifications", label: t("more.notifications"), icon: "notifications-outline" },
-  { route: "Money", label: t("more.money"), icon: "cash-outline" },
-  { route: "ActivityStats", label: t("more.stats"), icon: "stats-chart-outline" },
+    { route: "Money", label: t("more.money"), icon: "cash-outline" },
+    { route: "ActivityStats", label: t("more.stats"), icon: "stats-chart-outline" },
+    { route: "AiReport", label: t("more.aiReport"), icon: "sparkles-outline" },
     { route: "ActivityHistory", label: t("more.history"), icon: "list-outline" },
     { route: "Profile", label: t("more.profile"), icon: "person-outline" },
   ] as const;
 
   const isModernVariant = tasksDesignVariant === "modern";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const modernHeroStyle = isModernVariant
     ? mode === "dark"
       ? { backgroundColor: colors.card, borderColor: colors.border }
       : { backgroundColor: "#f7fbff", borderColor: "#d6e3f2" }
-    : undefined;
+    : isNightVariant
+      ? { backgroundColor: "#1c1542", borderColor: "#5d4a8f" }
+      : undefined;
   const modernRowStyle = isModernVariant
     ? mode === "dark"
       ? { backgroundColor: colors.cardSoft, borderColor: colors.border }
       : { backgroundColor: "#f8fbff", borderColor: "#d7dfec" }
-    : undefined;
+    : isNightVariant
+      ? { backgroundColor: "#211a4b", borderColor: "#5a478f" }
+      : undefined;
 
   return (
     <ScreenContainer>

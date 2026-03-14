@@ -16,6 +16,8 @@ import {
   deleteNotificationCampaign,
   deleteTask,
   deleteTaskCounterRule,
+  generateMotivationNotifications,
+  getAiAssistSettings,
   getLeaderboard,
   getScoringSettings,
   listCounters,
@@ -34,6 +36,7 @@ import {
   reviewDailyQuestionAnswer,
   setUserLeaderboardVisibility,
   updateAdminAccess,
+  updateAiAssistSettings,
   updateDailyQuestion,
   updateTask,
   updateScoringSettings,
@@ -81,6 +84,11 @@ router.delete(
   requireAdminPermission("NOTIFICATIONS"),
   asyncHandler(deleteNotificationCampaign)
 );
+router.post(
+  "/notifications/motivation/generate",
+  requireAdminPermission("NOTIFICATIONS"),
+  asyncHandler(generateMotivationNotifications)
+);
 router.post("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(createDailyQuestion));
 router.get("/daily-questions", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(listDailyQuestions));
 router.get(
@@ -100,5 +108,11 @@ router.patch(
 router.get("/leaderboard", requireAdminPermission("LEADERBOARD"), asyncHandler(getLeaderboard));
 router.get("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(getScoringSettings));
 router.patch("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(updateScoringSettings));
+router.get("/settings/ai-assist", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(getAiAssistSettings));
+router.patch(
+  "/settings/ai-assist",
+  requireAdminPermission("DAILY_QUESTIONS"),
+  asyncHandler(updateAiAssistSettings)
+);
 
 export default router;

@@ -39,6 +39,7 @@ const en = {
   "more.history": "Task History",
   "more.profile": "Profile",
   "more.guide": "App Guide",
+  "more.aiReport": "AI Report",
 
   "tasks.title": "Today's Tasks",
   "tasks.subtitle": "Complete normal tasks with category filters and clear task-type actions.",
@@ -399,6 +400,7 @@ const ar: Record<keyof typeof en, string> = {
   "more.history": "سجل المهام",
   "more.profile": "الملف الشخصي",
   "more.guide": "دليل التطبيق",
+  "more.aiReport": "تقرير ذكي",
 
   "tasks.title": "مهام اليوم",
   "tasks.subtitle": "أكمل مهامك اليومية بشكل واضح ومبسط.",

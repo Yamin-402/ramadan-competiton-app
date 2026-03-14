@@ -330,6 +330,43 @@ export const adminRepository = {
     });
   },
 
+  listActiveParticipantUsers(limit) {
+    return prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: "USER",
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+      },
+    });
+  },
+
+  listTaskCompletionActivitiesForUsers(userIds, fromDate) {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return [];
+    }
+
+    return prisma.activity.findMany({
+      where: {
+        userId: { in: userIds },
+        occurredAt: { gte: fromDate },
+        type: "TASK_COMPLETION",
+        isForbidden: false,
+      },
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      select: {
+        userId: true,
+        occurredAt: true,
+        effectivePoints: true,
+      },
+    });
+  },
+
   listUserIdsByTagIds(tagIds) {
     return prisma.userTag.findMany({
       where: {

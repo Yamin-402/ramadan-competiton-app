@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View } from "react-native";
-import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
+import Svg, { Circle, Defs, Path, Pattern, Rect } from "react-native-svg";
 import { TasksDesignVariant } from "../store/settings-store";
 import { AppColors } from "../theme/colors";
 
@@ -40,6 +40,35 @@ export function PatternBackground({ colors, variant = "classic" }: PatternBackgr
         <View style={[styles.bgModernGlow, styles.bgModernGlowBottom]} />
         <View style={styles.bgModernStripeA} />
         <View style={styles.bgModernStripeB} />
+      </View>
+    );
+  }
+
+  if (variant === "ramadan_nights") {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <LinearGradient
+          colors={["#09071a", "#130d2d", "#1f1450", "#2b1a69"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.bgNightGlow, styles.bgNightGlowTop]} />
+        <View style={[styles.bgNightGlow, styles.bgNightGlowBottom]} />
+        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+          <Circle cx="88" cy="94" r="34" fill="rgba(255, 231, 178, 0.20)" />
+          <Circle cx="102" cy="86" r="34" fill="#130d2d" />
+          <Circle cx="290" cy="208" r="28" fill="rgba(255, 231, 178, 0.17)" />
+          <Circle cx="301" cy="201" r="28" fill="#1f1450" />
+          <Circle cx="170" cy="440" r="22" fill="rgba(255, 231, 178, 0.14)" />
+          <Circle cx="180" cy="435" r="22" fill="#2b1a69" />
+          <Circle cx="54" cy="240" r="2.1" fill="rgba(255,255,255,0.48)" />
+          <Circle cx="142" cy="188" r="1.8" fill="rgba(255,255,255,0.52)" />
+          <Circle cx="322" cy="124" r="1.9" fill="rgba(255,255,255,0.4)" />
+          <Circle cx="286" cy="360" r="1.7" fill="rgba(255,255,255,0.45)" />
+          <Circle cx="100" cy="540" r="2.1" fill="rgba(255,255,255,0.36)" />
+          <Circle cx="256" cy="600" r="1.8" fill="rgba(255,255,255,0.36)" />
+        </Svg>
       </View>
     );
   }
@@ -139,5 +168,22 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "-16deg" }],
     backgroundColor: "rgba(72, 118, 216, 0.07)",
     borderRadius: 24,
+  },
+  bgNightGlow: {
+    position: "absolute",
+    borderRadius: 999,
+    backgroundColor: "rgba(173, 132, 255, 0.18)",
+  },
+  bgNightGlowTop: {
+    width: 260,
+    height: 260,
+    top: -110,
+    left: -90,
+  },
+  bgNightGlowBottom: {
+    width: 240,
+    height: 240,
+    bottom: -90,
+    right: -80,
   },
 });

@@ -23,6 +23,8 @@ function toUtcDateNumber(year: number, month: number, day: number) {
   return Date.UTC(year, month - 1, day);
 }
 
+const RAMADAN_TOTAL_DAYS = 30;
+
 export function getRamadanDayNumber(date = new Date()) {
   const current = getCairoDateParts(date);
   const currentUtc = toUtcDateNumber(current.year, current.month, current.day);
@@ -30,4 +32,9 @@ export function getRamadanDayNumber(date = new Date()) {
 
   const diffDays = Math.floor((currentUtc - startUtc) / (24 * 60 * 60 * 1000)) + 1;
   return diffDays > 0 ? diffDays : 0;
+}
+
+export function isRamadanActive(date = new Date()) {
+  const day = getRamadanDayNumber(date);
+  return day >= 1 && day <= RAMADAN_TOTAL_DAYS;
 }

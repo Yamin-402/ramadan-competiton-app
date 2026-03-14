@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { activitiesApi } from "../../../api/endpoints/activities.api";
 import { getApiErrorMessage } from "../../../api/client";
+import { AppButton } from "../../../components/AppButton";
 import { AppCard } from "../../../components/AppCard";
 import { EmptyState } from "../../../components/EmptyState";
 import { LoadingBlock } from "../../../components/LoadingBlock";
@@ -11,6 +12,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
 import { Activity } from "../../../types/domain";
+import { escapeHtml, exportPdfFromHtml } from "../../../utils/pdf-export";
 import { formatPoints } from "../../../utils/format";
 import { getRamadanDayNumber } from "../../../utils/ramadan";
 
@@ -320,15 +322,78 @@ function isInitialPointsActivity(item: Activity): boolean {
   return metadata?.kind === "INITIAL_POINTS";
 }
 
+function buildPdfStyles(direction: "rtl" | "ltr") {
+  return `
+  <style>
+    body {
+      font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Arial Unicode MS", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
+      direction: ${direction};
+      margin: 24px;
+      color: #16181d;
+      background: #ffffff;
+      line-height: 1.4;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    h2 { margin: 22px 0 8px; font-size: 16px; color: #2d2f38; }
+    .subtitle { color: #5b6070; margin-bottom: 14px; font-size: 12px; }
+    .summary {
+      border: 1px solid #d8deea;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 18px;
+      background: #f8fbff;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .summary-item {
+      border: 1px solid #d8deea;
+      border-radius: 8px;
+      padding: 8px;
+      background: #ffffff;
+    }
+    .summary-label { color: #5f6574; font-size: 11px; }
+    .summary-value { color: #1e2430; font-weight: 700; font-size: 13px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+    thead th {
+      background: #f3f6fc;
+      border: 1px solid #d6deea;
+      padding: 6px;
+    }
+    tbody td {
+      border: 1px solid #d6deea;
+      padding: 6px;
+      vertical-align: top;
+    }
+    .day-meta {
+      color: #575e6f;
+      font-size: 11px;
+      margin: 2px 0 6px;
+    }
+  </style>
+`;
+}
+
 export function ActivityHistoryScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const isModernVariant = tasksDesignVariant === "modern";
-  const isRamadanVariant = tasksDesignVariant === "ramadan_modern";
+  const isRamadanVariant =
+    tasksDesignVariant === "ramadan_modern" || tasksDesignVariant === "ramadan_nights";
+  const isNightVariant = tasksDesignVariant === "ramadan_nights";
   const textAlign = isArabic ? "right" : "left";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<Activity[]>([]);
   const [expandedByDay, setExpandedByDay] = useState<Record<string, boolean>>({});
 
@@ -435,18 +500,207 @@ export function ActivityHistoryScreen() {
     setExpandedByDay((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleExport = async (language: "ar" | "en") => {
+    setExporting(true);
+    setError(null);
+    try {
+      const isAr = language === "ar";
+      const labels = isAr
+        ? {
+            title: "سجل المهام",
+            generatedAt: "تاريخ التصدير",
+            overallTotal: "الإجمالي الكلي",
+            pointsGained: "النقاط المكتسبة",
+            pointsLost: "النقاط المفقودة",
+            dayTotal: "مجموع اليوم",
+            activities: "الأنشطة",
+            time: "الوقت",
+            task: "المهمة",
+            taskType: "نوع المهمة",
+            fasting: "التوقيت",
+            amount: "العدد",
+            points: "النقاط",
+            note: "ملاحظة",
+            fastingYes: "أثناء الصيام",
+            fastingNo: "إفطار",
+            minutes: "دقيقة",
+          }
+        : {
+            title: "Task History",
+            generatedAt: "Export date",
+            overallTotal: "Overall total",
+            pointsGained: "Points gained",
+            pointsLost: "Points lost",
+            dayTotal: "Day total",
+            activities: "Activities",
+            time: "Time",
+            task: "Task",
+            taskType: "Task type",
+            fasting: "Timing",
+            amount: "Amount",
+            points: "Points",
+            note: "Note",
+            fastingYes: "During fasting",
+            fastingNo: "Iftar",
+            minutes: "min",
+          };
+
+      const typeLabel = (item: Activity) => {
+        if (item.type === "DAILY_QUESTION_ANSWER") {
+          return isAr ? "سؤال يومي" : "Daily question";
+        }
+        if (item.type === "MANUAL_ADJUSTMENT") {
+          return isAr ? "تعديل المشرف" : "Manual adjustment";
+        }
+        const snapshot = getTaskSnapshot(item);
+        if (snapshot.flowType === "TIMED") {
+          return isAr ? "مؤقت" : "Timed";
+        }
+        if (snapshot.type === "COUNTER") {
+          return isAr ? "عداد" : "Counter";
+        }
+        if (snapshot.type === "CONDITIONAL") {
+          return isAr ? "شرطي" : "Conditional";
+        }
+        if (snapshot.type === "FORBIDDEN") {
+          return isAr ? "ممنوع" : "Forbidden";
+        }
+        return isAr ? "عادي" : "Normal";
+      };
+
+      const daySections = groupedDays
+        .map((day) => {
+          const dayLabel =
+            day.ramadanDay > 0
+              ? isAr
+                ? `????? ${day.ramadanDay} ?? ?????`
+                : `Day ${day.ramadanDay} of Ramadan`
+              : isAr
+                ? `???????: ${day.key}`
+                : `Date: ${day.key}`;
+
+          const rowsHtml = day.items
+            .map((item) => {
+              const snapshot = getTaskSnapshot(item);
+              const flowType = getTaskFlowType(item);
+              const enteredAmount = resolveEnteredAmount(item);
+              const isAmountTask =
+                item.type === "TASK_COMPLETION" &&
+                (flowType === "TIMED" || flowType === "COUNTER" || snapshot.type === "COUNTER");
+              const timeLabel = getCairoTimeLabel(new Date(item.occurredAt));
+              const note =
+                item.type === "MANUAL_ADJUSTMENT" && item.note ? String(item.note).trim() : "";
+              const amountLabel =
+                isAmountTask && enteredAmount !== null
+                  ? flowType === "TIMED"
+                    ? `${formatPoints(Math.round(enteredAmount))} ${labels.minutes}`
+                    : formatPoints(enteredAmount)
+                  : "-";
+              const fastingLabel =
+                item.type === "TASK_COMPLETION"
+                  ? item.isDuringFasting
+                    ? labels.fastingYes
+                    : labels.fastingNo
+                  : "-";
+              const exportTitle =
+                item.type === "DAILY_QUESTION_ANSWER"
+                  ? isAr
+                    ? "سؤال يومي"
+                    : "Daily question"
+                  : item.type === "MANUAL_ADJUSTMENT"
+                    ? isAr
+                      ? "تعديل المشرف"
+                      : "Manual adjustment"
+                    : snapshot.title || (isAr ? "مهمة" : "Task");
+
+              return `
+                <tr>
+                  <td>${escapeHtml(timeLabel)}</td>
+                  <td>${escapeHtml(exportTitle)}</td>
+                  <td>${escapeHtml(typeLabel(item))}</td>
+                  <td>${escapeHtml(fastingLabel)}</td>
+                  <td>${escapeHtml(amountLabel)}</td>
+                  <td>${escapeHtml(formatSignedPoints(item.effectivePoints))}</td>
+                  <td>${escapeHtml(note || "-")}</td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          return `
+            <section>
+              <h2>${escapeHtml(dayLabel)}</h2>
+              <div class="day-meta">${escapeHtml(labels.dayTotal)}: ${escapeHtml(formatPoints(day.dayPoints))} | ${escapeHtml(labels.activities)}: ${day.items.length}</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>${escapeHtml(labels.time)}</th>
+                    <th>${escapeHtml(labels.task)}</th>
+                    <th>${escapeHtml(labels.taskType)}</th>
+                    <th>${escapeHtml(labels.fasting)}</th>
+                    <th>${escapeHtml(labels.amount)}</th>
+                    <th>${escapeHtml(labels.points)}</th>
+                    <th>${escapeHtml(labels.note)}</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </section>
+          `;
+        })
+        .join("");
+
+      const html = `
+        <html lang="${isAr ? "ar" : "en"}">
+          <head>
+            <meta charset="utf-8" />
+            ${buildPdfStyles(isAr ? "rtl" : "ltr")}
+          </head>
+          <body>
+            <h1>${escapeHtml(labels.title)}</h1>
+            <div class="subtitle">${escapeHtml(labels.generatedAt)}: ${escapeHtml(new Date().toLocaleString())}</div>
+            <section class="summary">
+              <div class="summary-grid">
+                <div class="summary-item"><div class="summary-label">${escapeHtml(labels.overallTotal)}</div><div class="summary-value">${escapeHtml(formatPoints(overallPoints))}</div></div>
+                <div class="summary-item"><div class="summary-label">${escapeHtml(labels.pointsGained)}</div><div class="summary-value">${escapeHtml(formatPoints(pointsGained))}</div></div>
+                <div class="summary-item"><div class="summary-label">${escapeHtml(labels.pointsLost)}</div><div class="summary-value">${escapeHtml(formatPoints(pointsLost))}</div></div>
+                <div class="summary-item"><div class="summary-label">${escapeHtml(labels.dayTotal)}</div><div class="summary-value">${escapeHtml(formatPoints(groupedDays[0]?.dayPoints || 0))}</div></div>
+              </div>
+            </section>
+            ${daySections}
+          </body>
+        </html>
+      `;
+
+      await exportPdfFromHtml({
+        fileName: `task_history_${language}_${new Date().toISOString().slice(0, 10)}`,
+        html,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not export task history"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const variantCardStyle = isModernVariant
     ? { borderColor: "#d7dfec", backgroundColor: "#f8fbff" }
+    : isNightVariant
+      ? { borderColor: "#5d4a8f", backgroundColor: "#1b1540" }
     : isRamadanVariant
       ? { borderColor: "#ceb983", backgroundColor: "#fff8e7" }
       : undefined;
   const variantDayHeaderStyle = isModernVariant
     ? { backgroundColor: "#edf4ff", borderColor: "#d0deef" }
+    : isNightVariant
+      ? { backgroundColor: "#261d54", borderColor: "#58468c" }
     : isRamadanVariant
       ? { backgroundColor: "#f9edd1", borderColor: "#d6bf8e" }
       : { borderColor: colors.border };
   const variantRowStyle = isModernVariant
     ? { backgroundColor: "#f5f9ff", borderColor: "#d8e3f2" }
+    : isNightVariant
+      ? { backgroundColor: "#221a4c", borderColor: "#4f3f81" }
     : isRamadanVariant
       ? { backgroundColor: "#fff5dc", borderColor: "#dbc89b" }
       : { borderColor: colors.border };
@@ -457,6 +711,38 @@ export function ActivityHistoryScreen() {
       <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign }]}>
         {t("activityHistory.subtitle")}
       </Text>
+      <View style={styles.exportRow}>
+        <AppButton
+          label={
+            exporting
+              ? isArabic
+                ? "جاري التصدير..."
+                : "Exporting..."
+              : isArabic
+                ? "تصدير PDF (عربي)"
+                : "Export PDF (Arabic)"
+          }
+          variant="ghost"
+          onPress={() => void handleExport("ar")}
+          disabled={loading || groupedDays.length === 0 || exporting}
+          style={styles.exportButton}
+        />
+        <AppButton
+          label={
+            exporting
+              ? isArabic
+                ? "جاري التصدير..."
+                : "Exporting..."
+              : isArabic
+                ? "تصدير PDF (إنجليزي)"
+                : "Export PDF (English)"
+          }
+          variant="ghost"
+          onPress={() => void handleExport("en")}
+          disabled={loading || groupedDays.length === 0 || exporting}
+          style={styles.exportButton}
+        />
+      </View>
 
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
@@ -670,6 +956,13 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  exportRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  exportButton: {
+    flex: 1,
   },
   topSummaryRow: {
     flexDirection: "row",

@@ -75,28 +75,54 @@ function RamadanTimingToggle({
   value,
   onChange,
   t,
+  nightMode = false,
 }: {
   value: FastingSelection;
   onChange: (value: FastingSelection) => void;
   t: ReturnType<typeof useI18n>["t"];
+  nightMode?: boolean;
 }) {
   return (
     <View style={styles.ramadanTimingWrap}>
-      <Text style={styles.ramadanTimingLabel}>{t("tasks.timing")}</Text>
+      <Text style={nightMode ? styles.nightTimingLabel : styles.ramadanTimingLabel}>{t("tasks.timing")}</Text>
       <View style={styles.ramadanTimingRow}>
         <Pressable
           onPress={() => onChange("FASTING")}
-          style={[styles.ramadanTimingButton, value === "FASTING" && styles.ramadanTimingButtonActive]}
+          style={[
+            styles.ramadanTimingButton,
+            nightMode ? styles.nightTimingButton : null,
+            value === "FASTING" && styles.ramadanTimingButtonActive,
+            value === "FASTING" && nightMode ? styles.nightTimingButtonActive : null,
+          ]}
         >
-          <Text style={[styles.ramadanTimingButtonText, value === "FASTING" && styles.ramadanTimingButtonTextActive]}>
+          <Text
+            style={[
+              styles.ramadanTimingButtonText,
+              nightMode ? styles.nightTimingButtonText : null,
+              value === "FASTING" && styles.ramadanTimingButtonTextActive,
+              value === "FASTING" && nightMode ? styles.nightTimingButtonTextActive : null,
+            ]}
+          >
             {t("tasks.fasting")}
           </Text>
         </Pressable>
         <Pressable
           onPress={() => onChange("IFTAR")}
-          style={[styles.ramadanTimingButton, value === "IFTAR" && styles.ramadanTimingButtonActive]}
+          style={[
+            styles.ramadanTimingButton,
+            nightMode ? styles.nightTimingButton : null,
+            value === "IFTAR" && styles.ramadanTimingButtonActive,
+            value === "IFTAR" && nightMode ? styles.nightTimingButtonActive : null,
+          ]}
         >
-          <Text style={[styles.ramadanTimingButtonText, value === "IFTAR" && styles.ramadanTimingButtonTextActive]}>
+          <Text
+            style={[
+              styles.ramadanTimingButtonText,
+              nightMode ? styles.nightTimingButtonText : null,
+              value === "IFTAR" && styles.ramadanTimingButtonTextActive,
+              value === "IFTAR" && nightMode ? styles.nightTimingButtonTextActive : null,
+            ]}
+          >
             {t("tasks.iftar")}
           </Text>
         </Pressable>
@@ -385,7 +411,7 @@ export function TasksScreen() {
         />
       ) : null}
 
-      {tasksDesignVariant === "ramadan_modern" ? (
+      {tasksDesignVariant === "ramadan_modern" || tasksDesignVariant === "ramadan_nights" ? (
         <RamadanModernTasksView
           colors={colors}
           isArabic={isArabic}
@@ -419,6 +445,7 @@ export function TasksScreen() {
           successMessage={successMessage}
           onRefresh={handleRefresh}
           t={t}
+          nightMode={tasksDesignVariant === "ramadan_nights"}
         />
       ) : null}
 
@@ -489,6 +516,7 @@ interface TasksViewProps {
   successMessage: string | null;
   onRefresh: () => Promise<void>;
   t: ReturnType<typeof useI18n>["t"];
+  nightMode?: boolean;
 }
 
 function getCategoryLabel(category: string, t: ReturnType<typeof useI18n>["t"]) {
@@ -676,34 +704,52 @@ function RamadanModernTasksView({
   successMessage,
   onRefresh,
   t,
+  nightMode = false,
 }: TasksViewProps) {
   return (
     <>
       <LinearGradient
-        colors={["#0f3e2c", "#14543b", "#b79342"]}
+        colors={nightMode ? ["#110a2f", "#1c1146", "#2a1661", "#43208a"] : ["#0f3e2c", "#14543b", "#b79342"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.ramadanHero}
+        style={[styles.ramadanHero, nightMode ? styles.nightHero : null]}
       >
         <View style={styles.ramadanHeroRow}>
-          <Text style={styles.ramadanMoon}>☾</Text>
-          <Text style={styles.ramadanHeroEyebrow}>{t("tasks.ramadanLayoutEyebrow")}</Text>
+          <Text style={nightMode ? styles.nightMoon : styles.ramadanMoon}>{nightMode ? "☾ ✦" : "☾"}</Text>
+          <Text style={nightMode ? styles.nightHeroEyebrow : styles.ramadanHeroEyebrow}>
+            {nightMode ? (isArabic ? "ثيم العشر الأواخر" : "Last 10 Nights Theme") : t("tasks.ramadanLayoutEyebrow")}
+          </Text>
         </View>
-        <Text style={styles.ramadanHeroTitle}>{t("tasks.ramadanLayoutTitle")}</Text>
-        <Text style={styles.ramadanHeroSubtitle}>
-          {t("tasks.ramadanLayoutSubtitle")}
+        <Text style={nightMode ? styles.nightHeroTitle : styles.ramadanHeroTitle}>
+          {nightMode ? (isArabic ? "أجواء ليالي رمضان" : "Night of Reflection") : t("tasks.ramadanLayoutTitle")}
+        </Text>
+        <Text style={nightMode ? styles.nightHeroSubtitle : styles.ramadanHeroSubtitle}>
+          {nightMode
+            ? isArabic
+              ? "وضع ليلي مريح يساعدك تركز في العشر الأواخر وتكمل بثبات."
+              : "A calm night mode for the final ten nights. Keep your pace steady and your goals clear."
+            : t("tasks.ramadanLayoutSubtitle")}
         </Text>
         <View style={styles.ramadanStatsRow}>
-          <View style={styles.ramadanStatBlock}>
-            <Text style={styles.ramadanStatValue}>{streakSummary.activeStreaks}</Text>
-            <Text style={styles.ramadanStatLabel}>{t("tasks.activeStreaks")}</Text>
+          <View style={[styles.ramadanStatBlock, nightMode ? styles.nightStatBlock : null]}>
+            <Text style={nightMode ? styles.nightStatValue : styles.ramadanStatValue}>
+              {streakSummary.activeStreaks}
+            </Text>
+            <Text style={nightMode ? styles.nightStatLabel : styles.ramadanStatLabel}>{t("tasks.activeStreaks")}</Text>
           </View>
-          <View style={styles.ramadanStatBlock}>
-            <Text style={styles.ramadanStatValue}>{streakSummary.bestCurrentStreak}</Text>
-            <Text style={styles.ramadanStatLabel}>{t("tasks.bestCurrentStreak")}</Text>
+          <View style={[styles.ramadanStatBlock, nightMode ? styles.nightStatBlock : null]}>
+            <Text style={nightMode ? styles.nightStatValue : styles.ramadanStatValue}>
+              {streakSummary.bestCurrentStreak}
+            </Text>
+            <Text style={nightMode ? styles.nightStatLabel : styles.ramadanStatLabel}>{t("tasks.bestCurrentStreak")}</Text>
           </View>
-          <Pressable style={styles.ramadanRefreshPill} onPress={() => void onRefresh()}>
-            <Text style={styles.ramadanRefreshText}>{t("common.refresh")}</Text>
+          <Pressable
+            style={[styles.ramadanRefreshPill, nightMode ? styles.nightRefreshPill : null]}
+            onPress={() => void onRefresh()}
+          >
+            <Text style={nightMode ? styles.nightRefreshText : styles.ramadanRefreshText}>
+              {t("common.refresh")}
+            </Text>
           </Pressable>
         </View>
       </LinearGradient>
@@ -753,6 +799,7 @@ function RamadanModernTasksView({
               selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
               onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
               t={t}
+              nightMode={nightMode}
             />
           ))}
         </View>
@@ -872,6 +919,7 @@ function RamadanTaskCard({
   selectedInlineTaskKeys,
   onToggleInlineTaskKey,
   t,
+  nightMode = false,
 }: {
   task: Task;
   categoryLabel: string;
@@ -888,6 +936,7 @@ function RamadanTaskCard({
   selectedInlineTaskKeys: string[];
   onToggleInlineTaskKey: (key: string) => void;
   t: ReturnType<typeof useI18n>["t"];
+  nightMode?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const interactionKind = getTaskInteractionKind(task);
@@ -898,45 +947,49 @@ function RamadanTaskCard({
 
   return (
     <LinearGradient
-      colors={["#fff8e6", "#f5e8c7"]}
+      colors={nightMode ? ["#1a123f", "#261858", "#2f1e69"] : ["#fff8e6", "#f5e8c7"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.ramadanTaskCard}
+      style={[styles.ramadanTaskCard, nightMode ? styles.nightTaskCard : null]}
     >
       <View style={styles.ramadanTaskTop}>
         <View style={styles.ramadanTaskLeft}>
-          <Text style={styles.ramadanTaskTitle}>{task.title}</Text>
-          <Text style={styles.ramadanTaskMeta}>{categoryLabel} | {getTypeLabel(task, interactionKind, t)}</Text>
+          <Text style={nightMode ? styles.nightTaskTitle : styles.ramadanTaskTitle}>{task.title}</Text>
+          <Text style={nightMode ? styles.nightTaskMeta : styles.ramadanTaskMeta}>
+            {categoryLabel} | {getTypeLabel(task, interactionKind, t)}
+          </Text>
         </View>
-        <Text style={styles.ramadanTaskPoints}>+{task.basePoints}</Text>
+        <Text style={nightMode ? styles.nightTaskPoints : styles.ramadanTaskPoints}>+{task.basePoints}</Text>
       </View>
 
       {showStreak ? (
         <View style={styles.ramadanBadges}>
-          <Text style={styles.ramadanBadge}>
+          <Text style={[styles.ramadanBadge, nightMode ? styles.nightBadge : null]}>
             {t("tasks.streakLabel")}: {streakCount}
           </Text>
           {streakGoalDays ? (
-            <Text style={styles.ramadanBadge}>
+            <Text style={[styles.ramadanBadge, nightMode ? styles.nightBadge : null]}>
               {t("tasks.streakGoal")}: {streakCount}/{streakGoalDays}
             </Text>
           ) : null}
           {streakDaysLeft !== null ? (
-            <Text style={styles.ramadanBadge}>{t("tasks.streakLeft", { days: streakDaysLeft })}</Text>
+            <Text style={[styles.ramadanBadge, nightMode ? styles.nightBadge : null]}>
+              {t("tasks.streakLeft", { days: streakDaysLeft })}
+            </Text>
           ) : null}
         </View>
       ) : null}
 
       {expanded ? (
-        <View style={styles.ramadanDetailBox}>
-          <Text style={styles.ramadanDetailLine}>
+        <View style={[styles.ramadanDetailBox, nightMode ? styles.nightDetailBox : null]}>
+          <Text style={nightMode ? styles.nightDetailLine : styles.ramadanDetailLine}>
             {task.description || (interactionKind === "CONDITIONAL" ? t("tasks.conditionalHint") : t("tasks.noDescription"))}
           </Text>
         </View>
       ) : null}
 
       <Pressable onPress={() => setExpanded((prev) => !prev)}>
-        <Text style={styles.ramadanExpandText}>
+        <Text style={nightMode ? styles.nightExpandText : styles.ramadanExpandText}>
           {expanded ? t("common.hideDetails") : t("common.showDetails")}
         </Text>
       </Pressable>
@@ -953,13 +1006,35 @@ function RamadanTaskCard({
                   onPress={() => onToggleInlineTaskKey(item.key)}
                   style={[
                     styles.inlineTaskTodoItem,
-                    checked ? styles.inlineTaskTodoItemActiveRamadan : null,
+                    checked
+                      ? nightMode
+                        ? styles.inlineTaskTodoItemActiveNight
+                        : styles.inlineTaskTodoItemActiveRamadan
+                      : null,
                   ]}
                 >
-                  <View style={[styles.inlineTaskTodoCheck, checked ? styles.inlineTaskTodoCheckActiveRamadan : null]}>
+                  <View
+                    style={[
+                      styles.inlineTaskTodoCheck,
+                      checked
+                        ? nightMode
+                          ? styles.inlineTaskTodoCheckActiveNight
+                          : styles.inlineTaskTodoCheckActiveRamadan
+                        : null,
+                    ]}
+                  >
                     {checked ? <Text style={styles.inlineTaskTodoCheckMark}>✓</Text> : null}
                   </View>
-                  <Text style={[styles.inlineTaskTodoText, checked ? styles.inlineTaskTodoTextActiveRamadan : null]}>
+                  <Text
+                    style={[
+                      styles.inlineTaskTodoText,
+                      checked
+                        ? nightMode
+                          ? styles.inlineTaskTodoTextActiveNight
+                          : styles.inlineTaskTodoTextActiveRamadan
+                        : null,
+                    ]}
+                  >
                     {item.label}
                   </Text>
                 </Pressable>
@@ -975,12 +1050,17 @@ function RamadanTaskCard({
           onChangeText={onAmountChange}
           keyboardType="numeric"
           placeholder={isTimedTask(task) ? t("tasks.enterMinutes") : t("tasks.enterCount")}
-          placeholderTextColor="#8d7f58"
-          style={styles.ramadanInput}
+          placeholderTextColor={nightMode ? "#b6abd6" : "#8d7f58"}
+          style={[styles.ramadanInput, nightMode ? styles.nightInput : null]}
         />
       ) : null}
 
-      <RamadanTimingToggle value={fastingSelection} onChange={onFastingSelectionChange} t={t} />
+      <RamadanTimingToggle
+        value={fastingSelection}
+        onChange={onFastingSelectionChange}
+        t={t}
+        nightMode={nightMode}
+      />
 
       <View style={styles.ramadanActions}>
         <AppButton
@@ -1213,6 +1293,15 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
+  nightHero: {
+    borderWidth: 1,
+    borderColor: "rgba(174, 148, 255, 0.34)",
+    shadowColor: "#190f3a",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
   ramadanHeroRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1227,13 +1316,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  nightMoon: {
+    color: "#ebdcff",
+    fontSize: 20,
+  },
+  nightHeroEyebrow: {
+    color: "#c8b7f6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   ramadanHeroTitle: {
     color: "#fff7de",
     fontSize: 24,
     fontWeight: "900",
   },
+  nightHeroTitle: {
+    color: "#f5ecff",
+    fontSize: 24,
+    fontWeight: "900",
+  },
   ramadanHeroSubtitle: {
     color: "#ece1c3",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  nightHeroSubtitle: {
+    color: "#d6c9f3",
     fontSize: 13,
     lineHeight: 18,
   },
@@ -1249,13 +1357,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minWidth: 108,
   },
+  nightStatBlock: {
+    backgroundColor: "rgba(248, 237, 255, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(191, 164, 255, 0.24)",
+  },
   ramadanStatValue: {
     color: "#fff9e8",
     fontSize: 17,
     fontWeight: "900",
   },
+  nightStatValue: {
+    color: "#f8eeff",
+    fontSize: 17,
+    fontWeight: "900",
+  },
   ramadanStatLabel: {
     color: "#ecdbad",
+    fontSize: 11,
+  },
+  nightStatLabel: {
+    color: "#cabced",
     fontSize: 11,
   },
   ramadanRefreshPill: {
@@ -1265,8 +1387,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  nightRefreshPill: {
+    backgroundColor: "rgba(242, 199, 90, 0.24)",
+    borderWidth: 1,
+    borderColor: "rgba(242, 199, 90, 0.45)",
+  },
   ramadanRefreshText: {
     color: "#fff4d4",
+    fontWeight: "800",
+  },
+  nightRefreshText: {
+    color: "#fff6dd",
     fontWeight: "800",
   },
   listRamadan: {
@@ -1276,6 +1407,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 14,
     gap: 10,
+  },
+  nightTaskCard: {
+    borderWidth: 1,
+    borderColor: "rgba(177, 153, 248, 0.26)",
   },
   ramadanTaskTop: {
     flexDirection: "row",
@@ -1289,13 +1424,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
   },
+  nightTaskTitle: {
+    color: "#f4edff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
   ramadanTaskMeta: {
     color: "#4c5c50",
     fontSize: 12,
     marginTop: 1,
   },
+  nightTaskMeta: {
+    color: "#c8bbe8",
+    fontSize: 12,
+    marginTop: 1,
+  },
   ramadanTaskPoints: {
     color: "#7e5d1f",
+    fontWeight: "900",
+  },
+  nightTaskPoints: {
+    color: "#f2c75a",
     fontWeight: "900",
   },
   ramadanBadges: {
@@ -1313,6 +1462,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     overflow: "hidden",
   },
+  nightBadge: {
+    backgroundColor: "rgba(246, 235, 255, 0.12)",
+    color: "#e7dcff",
+  },
   ramadanDescription: {
     color: "#2f4a3d",
     lineHeight: 18,
@@ -1324,8 +1477,18 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 2,
   },
+  nightDetailBox: {
+    backgroundColor: "rgba(241, 231, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(192, 168, 255, 0.22)",
+  },
   ramadanDetailLine: {
     color: "#3d5648",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  nightDetailLine: {
+    color: "#dfd3fb",
     fontSize: 12,
     lineHeight: 17,
   },
@@ -1334,6 +1497,11 @@ const styles = StyleSheet.create({
   },
   ramadanTimingLabel: {
     color: "#4d5b52",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  nightTimingLabel: {
+    color: "#c8bce9",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -1348,19 +1516,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(81, 62, 26, 0.1)",
   },
+  nightTimingButton: {
+    borderWidth: 1,
+    borderColor: "rgba(194, 169, 255, 0.28)",
+    backgroundColor: "rgba(237, 222, 255, 0.08)",
+  },
   ramadanTimingButtonActive: {
     backgroundColor: "#d6b56b",
+  },
+  nightTimingButtonActive: {
+    borderColor: "rgba(242, 199, 90, 0.5)",
+    backgroundColor: "rgba(242, 199, 90, 0.2)",
   },
   ramadanTimingButtonText: {
     color: "#5b4722",
     fontSize: 12,
     fontWeight: "800",
   },
+  nightTimingButtonText: {
+    color: "#d9cdf8",
+    fontSize: 12,
+    fontWeight: "800",
+  },
   ramadanTimingButtonTextActive: {
     color: "#1e1708",
   },
+  nightTimingButtonTextActive: {
+    color: "#ffefc2",
+  },
   ramadanExpandText: {
     color: "#5d4519",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  nightExpandText: {
+    color: "#f2c75a",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -1372,6 +1562,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: "rgba(255,255,255,0.76)",
     color: "#24382f",
+  },
+  nightInput: {
+    borderColor: "rgba(188, 162, 252, 0.36)",
+    backgroundColor: "rgba(243, 234, 255, 0.08)",
+    color: "#f3eaff",
   },
   ramadanActions: {
     flexDirection: "row",
@@ -1577,6 +1772,17 @@ const styles = StyleSheet.create({
   },
   inlineTaskTodoTextActiveRamadan: {
     color: "#4d3a16",
+  },
+  inlineTaskTodoItemActiveNight: {
+    borderColor: "#c2a8ff",
+    backgroundColor: "rgba(195, 171, 255, 0.22)",
+  },
+  inlineTaskTodoCheckActiveNight: {
+    borderColor: "#c2a8ff",
+    backgroundColor: "#f2c75a",
+  },
+  inlineTaskTodoTextActiveNight: {
+    color: "#f8edff",
   },
   inlineTaskTodoItemActiveModern: {
     borderColor: "#3f7df3",

@@ -7,6 +7,8 @@ const conditionTypeSchema = z.enum(["TASK_COMPLETIONS", "COUNTER_TOTAL", "STREAK
 const conditionOperatorSchema = z.enum(["EQ", "NEQ", "GT", "GTE", "LT", "LTE"]);
 const notificationTargetTypeSchema = z.enum(["ALL_USERS", "TAGS", "USER_IDS"]);
 const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"]);
+const dailyQuestionTopicSchema = z.enum(["ANY", "FIQH", "HADITH", "QURAN", "AQEEDAH", "SEERAH", "AKHLAQ"]);
+const dailyQuestionDifficultySchema = z.enum(["ANY", "EASY", "MEDIUM", "HARD"]);
 const adminRoleSchema = z.enum(["ADMIN", "SUPER_ADMIN"]);
 const scoringMultiplierTimingSchema = z.enum(["FASTING", "IFTAR"]);
 
@@ -194,7 +196,15 @@ export const listDailyQuestionsQuerySchema = z.object({
 
 export const listDailyQuestionSuggestionsQuerySchema = z.object({
   answerType: dailyQuestionTypeSchema,
+  topic: dailyQuestionTopicSchema.default("ANY"),
+  difficulty: dailyQuestionDifficultySchema.default("ANY"),
   limit: z.coerce.number().int().min(1).max(10).default(5),
+});
+
+export const generateMotivationNotificationsSchema = z.object({
+  lookbackDays: z.coerce.number().int().min(3).max(90).default(14),
+  limitUsers: z.coerce.number().int().min(1).max(500).default(80),
+  dryRun: z.coerce.boolean().default(true),
 });
 
 export const dailyQuestionParamsSchema = z.object({
@@ -235,3 +245,14 @@ export const updateScoringSettingsSchema = z.object({
   multiplierValue: z.number().min(1).max(10),
   applyDuring: scoringMultiplierTimingSchema,
 });
+
+export const updateAiAssistSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    baseUrl: z.string().url().max(500).optional(),
+    model: z.string().trim().min(1).max(120).optional(),
+    timeoutMs: z.coerce.number().int().min(5000).max(90000).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required",
+  });

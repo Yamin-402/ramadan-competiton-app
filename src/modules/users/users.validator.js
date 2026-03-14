@@ -14,3 +14,15 @@ export const updateMyProfileSchema = z.object({
 export const publicProfileParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+export const generateMyAiReportSchema = z.object({
+  lookbackDays: z.coerce.number().int().min(3).max(60).default(14),
+  reportLength: z.enum(["SHORT", "MEDIUM", "LONG"]).default("MEDIUM"),
+  focusMode: z.enum(["SUMMARY", "COMPARISON", "BOTH"]).default("BOTH"),
+  language: z.enum(["AR", "EN"]).default("AR"),
+  tone: z.enum(["MOTIVATIONAL", "BALANCED", "STRICT"]).default("MOTIVATIONAL"),
+  includeDailyQuestions: z.boolean().default(true),
+  includeTiming: z.boolean().default(true),
+  includeTopTasks: z.boolean().default(true),
+  includeStreaks: z.boolean().default(true),
+});
