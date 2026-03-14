@@ -1,7 +1,10 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 import { usersApi } from "../../../api/endpoints/users.api";
 import { getApiErrorMessage } from "../../../api/client";
 import { AppCard } from "../../../components/AppCard";
@@ -11,6 +14,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { formatPoints } from "../../../utils/format";
 import { MoreStackParamList } from "../../../app/navigation/types";
+import { API_BASE_URL } from "../../../config/env";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "UserProfile">;
 
@@ -24,6 +28,8 @@ export function UserProfileScreen({ route }: Props) {
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof usersApi.getPublicProfile>> | null>(null);
   const [imageOpen, setImageOpen] = useState(false);
   const [imageMenuOpen, setImageMenuOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -83,16 +89,77 @@ export function UserProfileScreen({ route }: Props) {
       return;
     }
     try {
-      await Linking.openURL(avatarUrl);
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      setToastMessage(isArabic ? "جاري التحميل..." : "Downloading...");
+      const normalized = avatarUrl.trim();
+      const baseName = `profile_${userId}_${Date.now()}`;
+      let fileUri = "";
+      let extension = "jpg";
+
+      if (normalized.startsWith("data:")) {
+        const match = normalized.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+        if (!match) {
+          throw new Error("Invalid data url");
+        }
+        const mime = match[1];
+        extension = mime.split("/")[1] || "jpg";
+        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+        await FileSystem.writeAsStringAsync(fileUri, match[2], {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else if (normalized.startsWith("file://")) {
+        extension = normalized.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
+        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+        await FileSystem.copyAsync({ from: normalized, to: fileUri });
+      } else {
+        let downloadUrl = normalized;
+        if (!/^https?:\/\//i.test(downloadUrl)) {
+          const base = API_BASE_URL.replace(/\/api\/v1$/i, "");
+          downloadUrl = downloadUrl.startsWith("/") ? `${base}${downloadUrl}` : `${base}/${downloadUrl}`;
+        }
+        extension = downloadUrl.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
+        fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+        const download = await FileSystem.downloadAsync(downloadUrl, fileUri);
+        fileUri = download.uri;
+      }
+
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (permission.status === "granted") {
+        await MediaLibrary.createAssetAsync(fileUri);
+        setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
+      } else {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: `image/${extension === "jpg" ? "jpeg" : extension}`,
+            dialogTitle: t("profile.downloadPhoto"),
+          });
+          setToastMessage(isArabic ? "تم إرسال الصورة للمشاركة" : "Shared image");
+        } else {
+          await Linking.openURL(avatarUrl);
+          setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
+        }
+      }
     } catch {
-      // no-op
+      setToastMessage(isArabic ? "تعذر تحميل الصورة" : "Could not download image");
     } finally {
       setImageMenuOpen(false);
+      toastTimerRef.current = setTimeout(() => {
+        setToastMessage(null);
+      }, 2200);
     }
   };
 
+  const toastOverlay = toastMessage ? (
+    <View style={styles.toast}>
+      <Text style={styles.toastText}>{toastMessage}</Text>
+    </View>
+  ) : null;
+
   return (
-    <ScreenContainer>
+    <ScreenContainer fixedOverlay={toastOverlay}>
       <AppCard>
         <View style={styles.headerRow}>
           <Pressable onPress={openAvatar} disabled={!avatarUrl}>
@@ -161,7 +228,7 @@ export function UserProfileScreen({ route }: Props) {
           <View style={styles.imageFrame}>
             {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.expandedImage} resizeMode="contain" /> : null}
             <Pressable style={styles.imageMenuButton} onPress={() => setImageMenuOpen((prev) => !prev)}>
-              <Text style={styles.imageMenuButtonText}>⋮</Text>
+              <Text style={styles.imageMenuButtonText}>...</Text>
             </Pressable>
             {imageMenuOpen ? (
               <View style={[styles.imageMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -270,6 +337,22 @@ const styles = StyleSheet.create({
   },
   imageMenuText: {
     fontSize: 13,
+    fontWeight: "700",
+  },
+  toast: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 28,
+    backgroundColor: "rgba(0,0,0,0.82)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "700",
   },
 });

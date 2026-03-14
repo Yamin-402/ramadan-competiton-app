@@ -1,4 +1,6 @@
 import { Platform } from "react-native";
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
@@ -7,12 +9,41 @@ interface ExportPdfOptions {
   fileName: string;
 }
 
+let cachedArabicFontBase64: string | null = null;
+
 function toSafeFileName(value: string) {
   return String(value || "export")
     .trim()
     .replace(/[^a-zA-Z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 80) || "export";
+}
+
+export async function loadArabicFontBase64() {
+  if (Platform.OS === "web") {
+    return null;
+  }
+  if (cachedArabicFontBase64) {
+    return cachedArabicFontBase64;
+  }
+  try {
+    const asset = Asset.fromModule(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      require("../../assets/fonts/NotoNaskhArabic-Regular.ttf")
+    );
+    await asset.downloadAsync();
+    const uri = asset.localUri || asset.uri;
+    if (!uri) {
+      return null;
+    }
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    cachedArabicFontBase64 = base64;
+    return base64;
+  } catch {
+    return null;
+  }
 }
 
 export function escapeHtml(value: unknown) {

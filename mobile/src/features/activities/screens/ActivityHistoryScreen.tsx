@@ -12,7 +12,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
 import { Activity } from "../../../types/domain";
-import { escapeHtml, exportPdfFromHtml } from "../../../utils/pdf-export";
+import { escapeHtml, exportPdfFromHtml, loadArabicFontBase64 } from "../../../utils/pdf-export";
 import { formatPoints } from "../../../utils/format";
 import { getRamadanDayNumber } from "../../../utils/ramadan";
 
@@ -322,12 +322,22 @@ function isInitialPointsActivity(item: Activity): boolean {
   return metadata?.kind === "INITIAL_POINTS";
 }
 
-function buildPdfStyles(direction: "rtl" | "ltr") {
+function buildPdfStyles(direction: "rtl" | "ltr", fontBase64: string | null) {
   return `
   <style>
+    ${fontBase64 ? `
+    @font-face {
+      font-family: "NotoNaskhEmbedded";
+      src: url("data:font/ttf;base64,${fontBase64}") format("truetype");
+      font-weight: normal;
+      font-style: normal;
+    }` : `
+    @import url("https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap");
+    `}
     body {
-      font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Arial Unicode MS", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-family: ${fontBase64 ? '"NotoNaskhEmbedded"' : '"Noto Naskh Arabic"'}, "Noto Sans Arabic", "Amiri", "Arial Unicode MS", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
       direction: ${direction};
+      unicode-bidi: plaintext;
       margin: 24px;
       color: #16181d;
       background: #ffffff;
@@ -505,6 +515,7 @@ export function ActivityHistoryScreen() {
     setError(null);
     try {
       const isAr = language === "ar";
+      const fontBase64 = isAr ? await loadArabicFontBase64() : null;
       const labels = isAr
         ? {
             title: "سجل المهام",
@@ -654,7 +665,7 @@ export function ActivityHistoryScreen() {
         <html lang="${isAr ? "ar" : "en"}">
           <head>
             <meta charset="utf-8" />
-            ${buildPdfStyles(isAr ? "rtl" : "ltr")}
+            ${buildPdfStyles(isAr ? "rtl" : "ltr", fontBase64)}
           </head>
           <body>
             <h1>${escapeHtml(labels.title)}</h1>

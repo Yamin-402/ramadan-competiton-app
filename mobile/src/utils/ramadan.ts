@@ -25,10 +25,19 @@ function toUtcDateNumber(year: number, month: number, day: number) {
 
 const RAMADAN_TOTAL_DAYS = 30;
 
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+export function getRamadanStartDateKey(date = new Date()) {
+  const { year } = getCairoDateParts(date);
+  return `${year}-${pad2(RAMADAN_START_MONTH)}-${pad2(RAMADAN_START_DAY)}`;
+}
+
 export function getRamadanDayNumber(date = new Date()) {
   const current = getCairoDateParts(date);
   const currentUtc = toUtcDateNumber(current.year, current.month, current.day);
-  const startUtc = toUtcDateNumber(RAMADAN_START_YEAR, RAMADAN_START_MONTH, RAMADAN_START_DAY);
+  const startUtc = toUtcDateNumber(current.year, RAMADAN_START_MONTH, RAMADAN_START_DAY);
 
   const diffDays = Math.floor((currentUtc - startUtc) / (24 * 60 * 60 * 1000)) + 1;
   return diffDays > 0 ? diffDays : 0;

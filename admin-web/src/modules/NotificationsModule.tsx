@@ -198,7 +198,6 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>Summary</th>
                   <th>Notification title</th>
                   <th>Notification body</th>
                 </tr>
@@ -207,7 +206,6 @@ export function NotificationsModule({ tags, users }: NotificationsModuleProps) {
                 {motivationReports.map((report) => (
                   <tr key={report.userId}>
                     <td>{report.displayName || report.email}</td>
-                    <td>{report.summary}</td>
                     <td>{report.title}</td>
                     <td>{report.body}</td>
                   </tr>

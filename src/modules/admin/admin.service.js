@@ -6,6 +6,7 @@ import { getOrCreateFastingWindow } from "../../integrations/prayer-times/prayer
 import { fetchIslamicDailyQuestionSuggestions } from "../../integrations/daily-question-suggestions/islamic-questions.client.js";
 import {
   generateMotivationMessageWithAi,
+  generateDailyQuestionSuggestionWithAi,
   rewriteDailyQuestionSuggestionWithAi,
 } from "../../integrations/ai-assistant/ai-assistant.client.js";
 import { normalizeAdminPermissions } from "../../core/auth/admin-permissions.js";
@@ -494,6 +495,12 @@ function normalizeStringArray(values) {
   return values
     .map((value) => String(value).trim())
     .filter(Boolean);
+}
+
+function normalizeQuestionKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion) {
@@ -1516,9 +1523,7 @@ export const adminService = {
         query.difficulty
       );
     } catch (error) {
-      throw new AppError(502, "Could not fetch Islamic question suggestions", {
-        cause: error?.message || "unknown_error",
-      });
+      rawSuggestions = [];
     }
 
     const finalized = [];
@@ -1551,6 +1556,40 @@ export const adminService = {
       }
 
       finalized.push(normalized);
+    }
+
+    if (finalized.length < query.limit && aiSettings.enabled) {
+      const needed = query.limit - finalized.length;
+      for (let index = 0; index < needed; index += 1) {
+        try {
+          const generated = await generateDailyQuestionSuggestionWithAi(aiSettings, {
+            answerType: query.answerType,
+            topic: query.topic,
+            difficulty: query.difficulty,
+            styleProfile,
+          });
+          const normalized = normalizeSuggestionObject(
+            generated,
+            query.answerType,
+            generated || {}
+          );
+          if (!normalized) {
+            continue;
+          }
+          const uniqueKey = `${normalized.answerType}|${normalizeQuestionKey(normalized.questionText)}`;
+          const exists = finalized.some(
+            (row) => `${row.answerType}|${normalizeQuestionKey(row.questionText)}` === uniqueKey
+          );
+          if (!exists) {
+            finalized.push(normalized);
+          }
+        } catch {
+          // ignore AI errors and continue
+        }
+        if (finalized.length >= query.limit) {
+          break;
+        }
+      }
     }
 
     return finalized.slice(0, query.limit);

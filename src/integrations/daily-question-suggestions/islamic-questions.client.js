@@ -15,8 +15,8 @@ const LEADING_ANSWER_PREFIX_REGEX =
 const LEADING_PRAISE_PREFIX_REGEX =
   /^\s*\u0627\u0644\u062d\u0645\u062f\s+\u0644\u0644\u0647[.:\s\-]*/i;
 
-const MAX_FETCH_LENGTH = 100;
-const MAX_FETCH_ATTEMPTS = 5;
+const MAX_FETCH_LENGTH = 200;
+const MAX_FETCH_ATTEMPTS = 10;
 const MAX_EXPLANATION_LENGTH = 320;
 const MAX_SHORT_ANSWER_LENGTH = 140;
 const DATASET_SIZE_CACHE_TTL_MS = 1000 * 60 * 30;
@@ -124,7 +124,7 @@ function arabicRatio(value) {
 }
 
 function looksArabic(value) {
-  return arabicRatio(value) >= 0.35;
+  return arabicRatio(value) >= 0.2;
 }
 
 function normalizeConversationRole(message) {

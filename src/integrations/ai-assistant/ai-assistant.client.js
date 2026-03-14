@@ -91,6 +91,28 @@ export async function rewriteDailyQuestionSuggestionWithAi(config, context) {
   return callOllamaJson(config, prompt);
 }
 
+export async function generateDailyQuestionSuggestionWithAi(config, context) {
+  const prompt = [
+    "Generate one Islamic question suggestion for a Ramadan competition.",
+    "Return JSON only, with no markdown and no extra text.",
+    "All user-facing text MUST be in Arabic.",
+    `Requested answerType: ${context.answerType}`,
+    `Requested topic: ${context.topic || "ANY"}`,
+    `Requested difficulty: ${context.difficulty || "ANY"}`,
+    "Output rules:",
+    "- questionText: short, clear Arabic question (max 200 chars).",
+    "- correctAnswer: very concise.",
+    "- answerExplanation: concise Arabic explanation, max 220 chars.",
+    "- options: required only for choice-based answer types (2 to 5 options).",
+    "- topic must be one of: FIQH,HADITH,QURAN,AQEEDAH,SEERAH,AKHLAQ.",
+    "- difficulty must be one of: EASY,MEDIUM,HARD.",
+    `Admin style profile: ${JSON.stringify(context.styleProfile)}`,
+    'JSON shape: {"questionText":"...","correctAnswer":"...","answerExplanation":"...","options":[],"topic":"FIQH","difficulty":"EASY"}',
+  ].join("\n");
+
+  return callOllamaJson(config, prompt);
+}
+
 export async function generateMotivationMessageWithAi(config, context) {
   const prompt = [
     "Write a very short motivational notification.",

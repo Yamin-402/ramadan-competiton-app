@@ -11,7 +11,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { Activity } from "../../../types/domain";
 import { formatPoints } from "../../../utils/format";
-import { getRamadanDayNumber } from "../../../utils/ramadan";
+import { getRamadanDayNumber, getRamadanStartDateKey, isRamadanActive } from "../../../utils/ramadan";
 
 interface RankedValue {
   label: string;
@@ -50,6 +50,21 @@ function formatDayLabel(dateKey: string, isArabic: boolean): string {
     return isArabic ? `يوم ${ramadanDay}` : `Day ${ramadanDay}`;
   }
   return formatDateShort(dateKey);
+}
+
+function buildDateRange(startKey: string, endKey: string): string[] {
+  const startDate = new Date(`${startKey}T00:00:00.000Z`);
+  const endDate = new Date(`${endKey}T00:00:00.000Z`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return [];
+  }
+  const keys: string[] = [];
+  const cursor = new Date(startDate.getTime());
+  while (cursor.getTime() <= endDate.getTime()) {
+    keys.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return keys;
 }
 
 function DailyPointsGraph({
@@ -194,6 +209,9 @@ export function ActivityStatsScreen() {
       taskTotals.set(taskName, (taskTotals.get(taskName) || 0) + 1);
 
       const dateKey = getDateKey(row);
+      if (!dailyPoints.has(dateKey)) {
+        dailyPoints.set(dateKey, 0);
+      }
       if (effective > 0) {
         dailyPoints.set(dateKey, (dailyPoints.get(dateKey) || 0) + effective);
       }
@@ -216,10 +234,23 @@ export function ActivityStatsScreen() {
       .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
       .slice(0, 6);
 
-    const pointsByDay = Array.from(dailyPoints.entries())
+    const pointsByDayRaw = Array.from(dailyPoints.entries())
       .map(([date, gained]) => ({ date, gained }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-10);
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const pointsByDayMap = new Map(pointsByDayRaw.map((row) => [row.date, row.gained]));
+    const endKey = pointsByDayRaw[pointsByDayRaw.length - 1]?.date;
+    const startKey = endKey
+      ? isRamadanActive(new Date(`${endKey}T12:00:00.000Z`))
+        ? getRamadanStartDateKey(new Date(`${endKey}T12:00:00.000Z`))
+        : pointsByDayRaw[0]?.date
+      : undefined;
+    const filledPointsByDay =
+      startKey && endKey
+        ? buildDateRange(startKey, endKey).map((date) => ({
+            date,
+            gained: pointsByDayMap.get(date) || 0,
+          }))
+        : pointsByDayRaw;
 
     return {
       totalActivities: visibleRows.length,
@@ -228,7 +259,7 @@ export function ActivityStatsScreen() {
       forbiddenCount,
       topTasks,
       topCounters,
-      pointsByDay,
+      pointsByDay: filledPointsByDay,
     };
   }, [visibleRows]);
 
