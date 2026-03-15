@@ -1,4 +1,4 @@
-const DATASET_SERVER_ROWS_URL = "https://datasets-server.huggingface.co/rows";
+﻿const DATASET_SERVER_ROWS_URL = "https://datasets-server.huggingface.co/rows";
 const DATASET_SERVER_SIZE_URL = "https://datasets-server.huggingface.co/size";
 
 const DATASET_PROFILE = {
@@ -246,19 +246,25 @@ function toShortAnswer(value) {
   if (!normalized) {
     return "";
   }
-
   const segments = normalized
     .split(/[.\n\u061F!]/)
     .map((segment) => segment.trim())
     .filter(Boolean);
-
   if (segments.length === 0) {
     return truncateText(normalized, MAX_SHORT_ANSWER_LENGTH);
   }
-
-  const firstMeaningful = segments.find((segment) => segment.length >= 12) || segments[0];
-  return truncateText(firstMeaningful, MAX_SHORT_ANSWER_LENGTH);
+  const firstMeaningful = segments.find((segment) => segment.length >= 12);
+  if (firstMeaningful) {
+    return truncateText(firstMeaningful, MAX_SHORT_ANSWER_LENGTH);
+  }
+  const joined = segments.slice(0, 2).join("? ");
+  const candidate = joined || normalized;
+  if (candidate.length < 12) {
+    return truncateText(normalized, MAX_SHORT_ANSWER_LENGTH);
+  }
+  return truncateText(candidate, MAX_SHORT_ANSWER_LENGTH);
 }
+
 
 function toShortExplanation(value) {
   const normalized = normalizeText(value)

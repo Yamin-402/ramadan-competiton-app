@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
@@ -1583,7 +1583,7 @@ export const adminService = {
       const matchesDifficulty =
         !query.difficulty || query.difficulty === "ANY" || normalized.difficulty === query.difficulty;
       const questionLength = normalized.questionText.length;
-      const answerLength = (normalized.answerExplanation || "").length;
+      const answerLength = getSuggestionAnswerLength(normalized);
       const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
       const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
       if (!matchesTopic || !matchesDifficulty || !matchesQuestionLength || !matchesAnswerLength) {
@@ -1612,7 +1612,7 @@ export const adminService = {
             continue;
           }
           const questionLength = normalized.questionText.length;
-          const answerLength = (normalized.answerExplanation || "").length;
+          const answerLength = getSuggestionAnswerLength(normalized);
           const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
           const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
           if (!matchesQuestionLength || !matchesAnswerLength) {
@@ -1646,7 +1646,7 @@ export const adminService = {
         );
         if (normalized) {
           const questionLength = normalized.questionText.length;
-          const answerLength = (normalized.answerExplanation || "").length;
+          const answerLength = getSuggestionAnswerLength(normalized);
           const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
           const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
           if (!matchesQuestionLength || !matchesAnswerLength) {
@@ -1657,6 +1657,46 @@ export const adminService = {
       }
     }
 
+    const lengthFiltered = query.questionLength !== "ANY" || query.answerLength !== "ANY";
+    if (lengthFiltered && rawSuggestions.length > 0 && finalized.length < query.limit) {
+      const existingKeys = new Set(
+        finalized.map((row) => `${row.answerType}|${normalizeQuestionKey(row.questionText)}`)
+      );
+      const candidates = [];
+      for (const suggestion of rawSuggestions) {
+        if (finalized.length >= query.limit) {
+          break;
+        }
+        const normalized = normalizeSuggestionObject(suggestion, query.answerType, suggestion);
+        if (!normalized) {
+          continue;
+        }
+        const matchesTopic =
+          !query.topic || query.topic === "ANY" || normalized.topic === query.topic;
+        const matchesDifficulty =
+          !query.difficulty || query.difficulty === "ANY" || normalized.difficulty === query.difficulty;
+        if (!matchesTopic || !matchesDifficulty) {
+          continue;
+        }
+        const uniqueKey = `${normalized.answerType}|${normalizeQuestionKey(normalized.questionText)}`;
+        if (existingKeys.has(uniqueKey)) {
+          continue;
+        }
+        const questionLength = normalized.questionText.length;
+        const answerLength = getSuggestionAnswerLength(normalized);
+        const score =
+          lengthDistance(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX) +
+          lengthDistance(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
+        candidates.push({ normalized, score });
+      }
+      candidates.sort((a, b) => a.score - b.score);
+      for (const candidate of candidates) {
+        if (finalized.length >= query.limit) {
+          break;
+        }
+        finalized.push(candidate.normalized);
+      }
+    }
     return finalized.slice(0, query.limit);
   },
 
@@ -2066,10 +2106,10 @@ export const adminService = {
 
 
 
-const QUESTION_LENGTH_SHORT_MAX = 80;
-const QUESTION_LENGTH_MEDIUM_MAX = 140;
-const ANSWER_LENGTH_SHORT_MAX = 100;
-const ANSWER_LENGTH_MEDIUM_MAX = 220;
+const QUESTION_LENGTH_SHORT_MAX = 90;
+const QUESTION_LENGTH_MEDIUM_MAX = 160;
+const ANSWER_LENGTH_SHORT_MAX = 90;
+const ANSWER_LENGTH_MEDIUM_MAX = 180;
 
 function matchesLengthBucket(value, bucket, shortMax, mediumMax) {
   if (!bucket || bucket === "ANY") {
@@ -2083,4 +2123,39 @@ function matchesLengthBucket(value, bucket, shortMax, mediumMax) {
   }
   return value > mediumMax;
 }
+
+function lengthDistance(value, bucket, shortMax, mediumMax) {
+  if (!bucket || bucket === "ANY") {
+    return 0;
+  }
+  if (bucket === "SHORT") {
+    return value <= shortMax ? 0 : value - shortMax;
+  }
+  if (bucket === "MEDIUM") {
+    if (value < shortMax) {
+      return shortMax - value;
+    }
+    if (value > mediumMax) {
+      return value - mediumMax;
+    }
+    return 0;
+  }
+  return value > mediumMax ? 0 : mediumMax - value;
+}
+
+function getSuggestionAnswerLength(suggestion) {
+  const explanation = typeof suggestion.answerExplanation === "string" ? suggestion.answerExplanation.trim() : "";
+  if (explanation) {
+    return explanation.length;
+  }
+  const rawAnswer = Array.isArray(suggestion.correctAnswer)
+    ? suggestion.correctAnswer.join(" ")
+    : String(suggestion.correctAnswer ?? "");
+  return rawAnswer.trim().length;
+}
+
+
+
+
+
 

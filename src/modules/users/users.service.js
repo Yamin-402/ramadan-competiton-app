@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { generateUserProgressReportWithAi } from "../../integrations/ai-assistant/ai-assistant.client.js";
@@ -67,6 +67,12 @@ async function readAiAssistSettings() {
 }
 
 function toNumber(value) {
+  if (value && typeof value === "object" && typeof value.toString === "function") {
+    const parsedObj = Number(value.toString());
+    if (Number.isFinite(parsedObj)) {
+      return parsedObj;
+    }
+  }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -526,6 +532,13 @@ export const usersService = {
         try {
           const fallbackFromDate = profile.createdAt ? new Date(profile.createdAt) : new Date(0);
           activities = await usersRepository.listActivitiesForReport(userId, fallbackFromDate);
+        } catch {
+          activities = [];
+        }
+      }
+      if (activities.length === 0) {
+        try {
+          activities = await usersRepository.listActivitiesForReportAny(userId);
         } catch {
           activities = [];
         }

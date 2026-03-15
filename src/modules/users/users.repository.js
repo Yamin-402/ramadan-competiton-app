@@ -1,4 +1,4 @@
-import { prisma } from "../../core/db/prisma.js";
+﻿import { prisma } from "../../core/db/prisma.js";
 
 const userProfileSelect = {
   id: true,
@@ -55,6 +55,48 @@ export const usersRepository = {
       orderBy: {
         occurredAt: "asc",
       },
+      select: {
+        id: true,
+        type: true,
+        occurredAt: true,
+        competitionDate: true,
+        effectivePoints: true,
+        isDuringFasting: true,
+        isForbidden: true,
+        note: true,
+        metadata: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+          },
+        },
+        counterDeltas: {
+          select: {
+            delta: true,
+            counter: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  },
+
+  listActivitiesForReportAny(userId, limit = 2000) {
+    return prisma.activity.findMany({
+      where: {
+        userId,
+      },
+      orderBy: {
+        occurredAt: "asc",
+      },
+      take: limit,
       select: {
         id: true,
         type: true,
