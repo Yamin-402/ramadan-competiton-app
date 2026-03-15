@@ -1,4 +1,4 @@
-﻿import { AppError } from "../../core/errors/app-error.js";
+import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
@@ -20,7 +20,7 @@ const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
 };
 const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
-  enabled: false,
+  enabled: Boolean(env.aiApiKey),
   baseUrl: "https://api.groq.com/openai/v1",
   model: "llama-3.1-8b-instant",
   timeoutMs: 25000,
@@ -455,16 +455,25 @@ function normalizeScoringSettingsValue(value) {
 
 function normalizeAiAssistSettingsValue(value) {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const enabled =
-    raw.enabled === true || String(raw.enabled || "").trim().toLowerCase() === "true";
+  const enabledRaw = raw.enabled;
+  const hasEnvKey = Boolean(env.aiApiKey);
+  const enabled = hasEnvKey
+    ? true
+    : enabledRaw === undefined || enabledRaw === null
+      ? DEFAULT_AI_ASSIST_SETTINGS.enabled
+      : enabledRaw === true || String(enabledRaw || "").trim().toLowerCase() === "true";
   const baseUrl =
-    typeof raw.baseUrl === "string" && raw.baseUrl.trim().length > 0
-      ? raw.baseUrl.trim().replace(/\/+$/, "")
-      : DEFAULT_AI_ASSIST_SETTINGS.baseUrl;
+    hasEnvKey
+      ? DEFAULT_AI_ASSIST_SETTINGS.baseUrl
+      : typeof raw.baseUrl === "string" && raw.baseUrl.trim().length > 0
+        ? raw.baseUrl.trim().replace(/\/+$/, "")
+        : DEFAULT_AI_ASSIST_SETTINGS.baseUrl;
   const model =
-    typeof raw.model === "string" && raw.model.trim().length > 0
-      ? raw.model.trim()
-      : DEFAULT_AI_ASSIST_SETTINGS.model;
+    hasEnvKey
+      ? DEFAULT_AI_ASSIST_SETTINGS.model
+      : typeof raw.model === "string" && raw.model.trim().length > 0
+        ? raw.model.trim()
+        : DEFAULT_AI_ASSIST_SETTINGS.model;
   const timeoutMsRaw = Number(raw.timeoutMs);
   const timeoutMs = Number.isFinite(timeoutMsRaw)
     ? Math.max(5000, Math.min(90000, Math.floor(timeoutMsRaw)))

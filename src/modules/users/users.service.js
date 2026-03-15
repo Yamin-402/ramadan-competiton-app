@@ -1,4 +1,4 @@
-﻿import { AppError } from "../../core/errors/app-error.js";
+import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { generateUserProgressReportWithAi } from "../../integrations/ai-assistant/ai-assistant.client.js";
@@ -6,7 +6,7 @@ import { usersRepository } from "./users.repository.js";
 
 const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
-  enabled: false,
+  enabled: Boolean(env.aiApiKey),
   baseUrl: "https://api.groq.com/openai/v1",
   model: "llama-3.1-8b-instant",
   timeoutMs: 25000,
@@ -29,16 +29,25 @@ function isEducationTagKey(key) {
 
 function normalizeAiAssistSettingsValue(value) {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const enabled =
-    raw.enabled === true || String(raw.enabled || "").trim().toLowerCase() === "true";
+  const enabledRaw = raw.enabled;
+  const hasEnvKey = Boolean(env.aiApiKey);
+  const enabled = hasEnvKey
+    ? true
+    : enabledRaw === undefined || enabledRaw === null
+      ? DEFAULT_AI_ASSIST_SETTINGS.enabled
+      : enabledRaw === true || String(enabledRaw || "").trim().toLowerCase() === "true";
   const baseUrl =
-    typeof raw.baseUrl === "string" && raw.baseUrl.trim().length > 0
-      ? raw.baseUrl.trim().replace(/\/+$/, "")
-      : DEFAULT_AI_ASSIST_SETTINGS.baseUrl;
+    hasEnvKey
+      ? DEFAULT_AI_ASSIST_SETTINGS.baseUrl
+      : typeof raw.baseUrl === "string" && raw.baseUrl.trim().length > 0
+        ? raw.baseUrl.trim().replace(/\/+$/, "")
+        : DEFAULT_AI_ASSIST_SETTINGS.baseUrl;
   const model =
-    typeof raw.model === "string" && raw.model.trim().length > 0
-      ? raw.model.trim()
-      : DEFAULT_AI_ASSIST_SETTINGS.model;
+    hasEnvKey
+      ? DEFAULT_AI_ASSIST_SETTINGS.model
+      : typeof raw.model === "string" && raw.model.trim().length > 0
+        ? raw.model.trim()
+        : DEFAULT_AI_ASSIST_SETTINGS.model;
   const timeoutMsRaw = Number(raw.timeoutMs);
   const timeoutMs = Number.isFinite(timeoutMsRaw)
     ? Math.max(5000, Math.min(90000, Math.floor(timeoutMsRaw)))
@@ -270,27 +279,27 @@ function toShortList(items, limit) {
 function buildFallbackReport(profile, analytics, options) {
   const isArabic = options.language === "AR";
   const shortName = (profile.displayName || profile.email || "").trim().split(" ")[0] || "";
-  const greetingName = shortName ? `${isArabic ? "ÙŠØ§" : ""} ${shortName}`.trim() : "";
+  const greetingName = shortName ? `${isArabic ? "يا" : ""} ${shortName}`.trim() : "";
 
   const highlights = [];
   if (analytics.totals.totalActivities > 0) {
     highlights.push(
       isArabic
-        ? `Ø£Ù†Ø¬Ø²Øª ${analytics.totals.totalActivities} Ù†Ø´Ø§Ø· ÙÙŠ Ø¢Ø®Ø± ${analytics.totals.lookbackDays} ÙŠÙˆÙ….`
+        ? `أنجزت ${analytics.totals.totalActivities} نشاط في آخر ${analytics.totals.lookbackDays} يوم.`
         : `You completed ${analytics.totals.totalActivities} activities in the last ${analytics.totals.lookbackDays} days.`
     );
   }
   if (options.includeTiming) {
     highlights.push(
       isArabic
-        ? `ØªØ³Ø¬ÙŠÙ„Ø§Øª Ø§Ù„ØµÙŠØ§Ù…: ${analytics.timing.fastingCount} | Ø§Ù„Ø¥ÙØ·Ø§Ø±: ${analytics.timing.iftarCount}.`
+        ? `تسجيلات الصيام: ${analytics.timing.fastingCount} | الإفطار: ${analytics.timing.iftarCount}.`
         : `Fasting logs: ${analytics.timing.fastingCount} | Iftar logs: ${analytics.timing.iftarCount}.`
     );
   }
   if (options.includeDailyQuestions) {
     highlights.push(
       isArabic
-        ? `Ø¥Ø¬Ø§Ø¨Ø§Øª Ø§Ù„Ø³Ø¤Ø§Ù„ Ø§Ù„ÙŠÙˆÙ…ÙŠ: ${analytics.dailyQuestions.answered} Ø¨Ø¯Ù‚Ø© ${analytics.dailyQuestions.accuracy}%.`
+        ? `إجابات السؤال اليومي: ${analytics.dailyQuestions.answered} بدقة ${analytics.dailyQuestions.accuracy}%.`
         : `Daily questions: ${analytics.dailyQuestions.answered} answered with ${analytics.dailyQuestions.accuracy}% accuracy.`
     );
   }
@@ -298,14 +307,14 @@ function buildFallbackReport(profile, analytics, options) {
     const top = analytics.topTasks[0];
     highlights.push(
       isArabic
-        ? `Ø£ÙƒØ«Ø± Ù…Ù‡Ù…Ø© Ø§Ù„ØªØ²Ù…Øª Ø¨Ù‡Ø§: ${top.taskTitle} (${top.count} Ù…Ø±Ø§Øª).`
+        ? `أكثر مهمة التزمت بها: ${top.taskTitle} (${top.count} مرات).`
         : `Most repeated task: ${top.taskTitle} (${top.count} times).`
     );
   }
   if (options.includeStreaks) {
     highlights.push(
       isArabic
-        ? `Ø£ÙØ¶Ù„ Ø§Ø³ØªÙ…Ø±Ø§Ø±ÙŠØ© Ø­Ø§Ù„ÙŠØ©: ${analytics.streaks.bestCurrentStreak} ÙŠÙˆÙ….`
+        ? `أفضل استمرارية حالية: ${analytics.streaks.bestCurrentStreak} يوم.`
         : `Best current streak: ${analytics.streaks.bestCurrentStreak} days.`
     );
   }
@@ -313,40 +322,40 @@ function buildFallbackReport(profile, analytics, options) {
   const actionPlan = [];
   actionPlan.push(
     isArabic
-      ? "Ø«Ø¨Øª Ù…Ù‡Ù…ØªÙŠÙ† Ø£Ø³Ø§Ø³ÙŠØªÙŠÙ† ÙŠÙˆÙ…ÙŠÙ‹Ø§ ÙˆØ§Ù„ØªØ²Ù… Ø¨Ù‡Ù… ÙÙŠ Ù†ÙØ³ Ø§Ù„ÙˆÙ‚Øª."
+      ? "ثبت مهمتين أساسيتين يوميًا والتزم بهم في نفس الوقت."
       : "Lock two core daily tasks and keep them at fixed times."
   );
   if (options.focusMode === "COMPARISON" || options.focusMode === "BOTH") {
     actionPlan.push(
       isArabic
-        ? "Ø±Ø§Ø¬Ø¹ Ø§Ù„Ø£ÙŠØ§Ù… Ø§Ù„Ø¶Ø¹ÙŠÙØ© ÙˆØ§Ø¨Ø¯Ø£ ÙÙŠÙ‡Ø§ Ø¨Ù…Ù‡Ø§Ù… Ø¨Ø³ÙŠØ·Ø© Ø¬Ø¯Ù‹Ø§ Ù„Ø±ÙØ¹ Ø§Ù„Ù…ØªÙˆØ³Ø·."
+        ? "راجع الأيام الضعيفة وابدأ فيها بمهام بسيطة جدًا لرفع المتوسط."
         : "Review weak days and start with very simple tasks to raise your average."
     );
   }
   actionPlan.push(
     isArabic
-      ? "Ø§Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø³Ø¤Ø§Ù„ Ø§Ù„ÙŠÙˆÙ…ÙŠ ÙƒØ¹Ø§Ø¯Ø© Ø«Ø§Ø¨ØªØ© Ù‚Ø¨Ù„ Ù†Ù‡Ø§ÙŠØ© Ø§Ù„ÙŠÙˆÙ…."
+      ? "استخدم السؤال اليومي كعادة ثابتة قبل نهاية اليوم."
       : "Use the daily question as a fixed habit before day end."
   );
 
   const title = isArabic
-    ? `ØªÙ‚Ø±ÙŠØ± ØªÙ‚Ø¯Ù…Ùƒ ${greetingName}`.trim()
+    ? `تقرير تقدمك ${greetingName}`.trim()
     : `Your Progress Report ${greetingName}`.trim();
   const summary = isArabic
-    ? `Ù…Ø¬Ù…ÙˆØ¹ Ù†Ù‚Ø§Ø·Ùƒ Ø®Ù„Ø§Ù„ Ø§Ù„ÙØªØ±Ø© Ù‡Ùˆ ${analytics.totals.totalPoints} Ù…Ø¹ Ù†Ø´Ø§Ø· ÙÙŠ ${analytics.totals.activeDays} ÙŠÙˆÙ…. Ø§Ù„Ù…ØªÙˆØ³Ø· Ø§Ù„ÙŠÙˆÙ…ÙŠ ${analytics.totals.averagePointsPerActiveDay} Ù†Ù‚Ø·Ø©.`
+    ? `مجموع نقاطك خلال الفترة هو ${analytics.totals.totalPoints} مع نشاط في ${analytics.totals.activeDays} يوم. المتوسط اليومي ${analytics.totals.averagePointsPerActiveDay} نقطة.`
     : `Your total points in this period are ${analytics.totals.totalPoints}, with activity on ${analytics.totals.activeDays} days. Daily average is ${analytics.totals.averagePointsPerActiveDay} points.`;
   const comparison =
     options.focusMode === "SUMMARY"
       ? isArabic
-        ? "ÙˆØ¶Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ ÙˆØ§Ø¶Ø­ØŒ Ø±ÙƒØ² Ø¹Ù„Ù‰ Ø§Ù„Ø«Ø¨Ø§Øª Ø§Ù„ÙŠÙˆÙ…ÙŠ Ø£ÙƒØ«Ø± Ù…Ù† Ø§Ù„ÙƒÙ…ÙŠØ©."
+        ? "وضعك الحالي واضح، ركز على الثبات اليومي أكثر من الكمية."
         : "Your current picture is clear; focus on consistency more than volume."
       : isArabic
-        ? `Ù…ØªÙˆØ³Ø· Ø§Ù„Ù†ØµÙ Ø§Ù„Ø£ÙˆÙ„ ${analytics.comparison.firstHalfAveragePoints} Ù†Ù‚Ø·Ø© Ù…Ù‚Ø§Ø¨Ù„ ${analytics.comparison.secondHalfAveragePoints} Ù„Ù„Ù†ØµÙ Ø§Ù„Ø«Ø§Ù†ÙŠ (ÙØ±Ù‚ ${analytics.comparison.trendDelta}).`
+        ? `متوسط النصف الأول ${analytics.comparison.firstHalfAveragePoints} نقطة مقابل ${analytics.comparison.secondHalfAveragePoints} للنصف الثاني (فرق ${analytics.comparison.trendDelta}).`
         : `First-half average is ${analytics.comparison.firstHalfAveragePoints} points vs ${analytics.comparison.secondHalfAveragePoints} in second half (delta ${analytics.comparison.trendDelta}).`;
   const motivation = isArabic
     ? options.tone === "STRICT"
-      ? "Ø§Ù„Ù†ØªÙŠØ¬Ø© ØªØªØ­Ø³Ù† Ø¨Ø§Ù„Ø§Ù„ØªØ²Ø§Ù… Ø§Ù„ÙŠÙˆÙ…ÙŠ. Ù‚Ù„Ù„ Ø§Ù„ØªØ´ØªØª ÙˆØ±ÙƒØ² Ø¹Ù„Ù‰ ØªÙ†ÙÙŠØ° Ø®Ø·Ø© Ø«Ø§Ø¨ØªØ©."
-      : "Ù…Ø³ØªÙˆØ§Ùƒ Ù‚Ø§Ø¨Ù„ Ù„Ù„ØªØ­Ø³Ù† Ø¨Ø³Ø±Ø¹Ø©. Ø®Ø·ÙˆØ© ØµØºÙŠØ±Ø© Ø«Ø§Ø¨ØªØ© ÙƒÙ„ ÙŠÙˆÙ… Ù‡ØªÙØ±Ù‚ Ø¬Ø¯Ù‹Ø§."
+      ? "النتيجة تتحسن بالالتزام اليومي. قلل التشتت وركز على تنفيذ خطة ثابتة."
+      : "مستواك قابل للتحسن بسرعة. خطوة صغيرة ثابتة كل يوم هتفرق جدًا."
     : options.tone === "STRICT"
       ? "Results improve with daily discipline. Reduce distractions and execute a steady plan."
       : "Your level can improve quickly. One small consistent step every day will make a big difference.";

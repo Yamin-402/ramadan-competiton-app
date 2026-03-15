@@ -9,6 +9,9 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   assetBundlePatterns: ["**/*"],
+  updates: {
+    enabled: false,
+  },
   icon: "./assets/images/icon.png",
   ios: {
     supportsTablet: true,

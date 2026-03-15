@@ -614,59 +614,61 @@ export function DailyQuestionsModule() {
             </select>
           </label>
 
-          <fieldset className="form-grid__full">
-            <legend>AI assistant settings</legend>
-            {loadingAiSettings ? <p className="muted-text">Loading AI settings...</p> : null}
-            <div className="inline-form">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={aiSettings.enabled}
-                  onChange={(event) =>
-                    setAiSettings((prev) => ({ ...prev, enabled: event.target.checked }))
-                  }
-                />
-                Enable AI rewriting
-              </label>
-              <label>
-                AI URL
-                <input
-                  value={aiSettings.baseUrl}
-                  onChange={(event) =>
-                    setAiSettings((prev) => ({ ...prev, baseUrl: event.target.value }))
-                  }
-                  placeholder="https://api.groq.com/openai/v1"
-                />
-              </label>
-              <label>
-                Model
-                <input
-                  value={aiSettings.model}
-                  onChange={(event) =>
-                    setAiSettings((prev) => ({ ...prev, model: event.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                Timeout ms
-                <input
-                  type="number"
-                  min={5000}
-                  max={90000}
-                  value={String(aiSettings.timeoutMs)}
-                  onChange={(event) =>
-                    setAiSettings((prev) => ({
-                      ...prev,
-                      timeoutMs: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <button type="button" onClick={() => void saveAiSettings()} disabled={savingAiSettings}>
-                {savingAiSettings ? "Saving..." : "Save AI settings"}
-              </button>
-            </div>
-          </fieldset>
+          {false && (
+            <fieldset className="form-grid__full">
+              <legend>AI assistant settings</legend>
+              {loadingAiSettings ? <p className="muted-text">Loading AI settings...</p> : null}
+              <div className="inline-form">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={aiSettings.enabled}
+                    onChange={(event) =>
+                      setAiSettings((prev) => ({ ...prev, enabled: event.target.checked }))
+                    }
+                  />
+                  Enable AI rewriting
+                </label>
+                <label>
+                  AI URL
+                  <input
+                    value={aiSettings.baseUrl}
+                    onChange={(event) =>
+                      setAiSettings((prev) => ({ ...prev, baseUrl: event.target.value }))
+                    }
+                    placeholder="https://api.groq.com/openai/v1"
+                  />
+                </label>
+                <label>
+                  Model
+                  <input
+                    value={aiSettings.model}
+                    onChange={(event) =>
+                      setAiSettings((prev) => ({ ...prev, model: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  Timeout ms
+                  <input
+                    type="number"
+                    min={5000}
+                    max={90000}
+                    value={String(aiSettings.timeoutMs)}
+                    onChange={(event) =>
+                      setAiSettings((prev) => ({
+                        ...prev,
+                        timeoutMs: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+                <button type="button" onClick={() => void saveAiSettings()} disabled={savingAiSettings}>
+                  {savingAiSettings ? "Saving..." : "Save AI settings"}
+                </button>
+              </div>
+            </fieldset>
+          )}
 
           <div className="form-grid__full">
             <div className="inline-form">
