@@ -9,6 +9,7 @@ import { LoadingBlock } from "../../../components/LoadingBlock";
 import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
+import { useAuthStore } from "../../../store/auth-store";
 import { formatPoints } from "../../../utils/format";
 import { MoreStackParamList } from "../../../app/navigation/types";
 import { API_BASE_URL } from "../../../config/env";
@@ -89,17 +90,23 @@ export function UserProfileScreen({ route }: Props) {
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current);
       }
-      setToastMessage(isArabic ? "جاري التحميل..." : "Downloading...");
+      setToastMessage(t("profile.downloadStart"));
       const normalized = avatarUrl.trim();
       if (Platform.OS === "web") {
         await Linking.openURL(normalized);
-        setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
+        setToastMessage(t("profile.downloadOpened"));
       } else {
         const FileSystem = await import("expo-file-system");
         const MediaLibrary = await import("expo-media-library");
         const Sharing = await import("expo-sharing");
 
         const baseName = `profile_${userId}_${Date.now()}`;
+        const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+        if (!baseDir) {
+          throw new Error("File system directory is missing");
+        }
+        const safeBaseDir = baseDir.endsWith("/") ? baseDir : `${baseDir}/`;
+        const { token } = useAuthStore.getState();
         let fileUri = "";
         let extension = "jpg";
 
@@ -110,13 +117,13 @@ export function UserProfileScreen({ route }: Props) {
           }
           const mime = match[1];
           extension = mime.split("/")[1] || "jpg";
-          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+          fileUri = `${safeBaseDir}${baseName}.${extension}`;
           await FileSystem.writeAsStringAsync(fileUri, match[2], {
             encoding: FileSystem.EncodingType.Base64,
           });
         } else if (normalized.startsWith("file://")) {
           extension = normalized.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
-          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
+          fileUri = `${safeBaseDir}${baseName}.${extension}`;
           await FileSystem.copyAsync({ from: normalized, to: fileUri });
         } else {
           let downloadUrl = normalized;
@@ -125,8 +132,9 @@ export function UserProfileScreen({ route }: Props) {
             downloadUrl = downloadUrl.startsWith("/") ? `${base}${downloadUrl}` : `${base}/${downloadUrl}`;
           }
           extension = downloadUrl.split("?")[0].split(".").pop()?.toLowerCase() || "jpg";
-          fileUri = `${FileSystem.cacheDirectory ?? ""}${baseName}.${extension}`;
-          const download = await FileSystem.downloadAsync(downloadUrl, fileUri);
+          fileUri = `${safeBaseDir}${baseName}.${extension}`;
+          const downloadOptions = token ? { headers: { Authorization: `Bearer ${token}`} } : undefined;
+          const download = await FileSystem.downloadAsync(downloadUrl, fileUri, downloadOptions);
           fileUri = download.uri;
         }
 
@@ -139,10 +147,10 @@ export function UserProfileScreen({ route }: Props) {
         if (canSave) {
           try {
             await MediaLibrary.createAssetAsync(fileUri);
-            setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
+            setToastMessage(t("profile.downloadSaved"));
           } catch {
             await MediaLibrary.saveToLibraryAsync(fileUri);
-            setToastMessage(isArabic ? "تم حفظ الصورة في المعرض" : "Saved to gallery");
+            setToastMessage(t("profile.downloadSaved"));
           }
         } else {
           const canShare = await Sharing.isAvailableAsync();
@@ -151,15 +159,15 @@ export function UserProfileScreen({ route }: Props) {
               mimeType: `image/${extension === "jpg" ? "jpeg" : extension}`,
               dialogTitle: t("profile.downloadPhoto"),
             });
-            setToastMessage(isArabic ? "تم إرسال الصورة للمشاركة" : "Shared image");
+            setToastMessage(t("profile.downloadShared"));
           } else {
             await Linking.openURL(avatarUrl);
-            setToastMessage(isArabic ? "تم فتح الصورة" : "Opened image");
+            setToastMessage(t("profile.downloadOpened"));
           }
         }
       }
     } catch {
-      setToastMessage(isArabic ? "تعذر تحميل الصورة" : "Could not download image");
+      setToastMessage(t("profile.downloadFailed"));
     } finally {
       setImageMenuOpen(false);
       toastTimerRef.current = setTimeout(() => {
@@ -372,3 +380,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+﻿import { FormEvent, useEffect, useMemo, useState } from "react";
 import { adminApi } from "../api/admin-api";
 import { toApiErrorMessage } from "../api/http";
 import { PanelCard } from "../components/PanelCard";
@@ -323,8 +323,8 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [newInlineTaskName, setNewInlineTaskName] = useState("");
-  const [multiplierValue, setMultiplierValue] = useState("1.5");
-  const [multiplierApplyDuring, setMultiplierApplyDuring] = useState<"FASTING" | "IFTAR">("IFTAR");
+  const [fastingMultiplier, setFastingMultiplier] = useState("1");
+  const [iftarMultiplier, setIftarMultiplier] = useState("1.5");
   const [savingMultiplier, setSavingMultiplier] = useState(false);
 
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => b.id - a.id), [tasks]);
@@ -350,8 +350,8 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
         if (!mounted) {
           return;
         }
-        setMultiplierValue(String(settings.multiplierValue));
-        setMultiplierApplyDuring(settings.applyDuring);
+        setFastingMultiplier(String(settings.fastingMultiplier));
+        setIftarMultiplier(String(settings.iftarMultiplier));
       } catch {
         // keep defaults
       }
@@ -917,14 +917,15 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
     setSuccess(null);
     setSavingMultiplier(true);
     try {
-      const value = Number(multiplierValue);
-      if (!Number.isFinite(value) || value < 1) {
-        throw new Error("Multiplier must be a number greater than or equal to 1.");
+      const fasting = Number(fastingMultiplier);
+      const iftar = Number(iftarMultiplier);
+      if (!Number.isFinite(fasting) || fasting < 1 || !Number.isFinite(iftar) || iftar < 1) {
+        throw new Error("Multipliers must be numbers greater than or equal to 1.");
       }
 
       await adminApi.updateScoringSettings({
-        multiplierValue: value,
-        applyDuring: multiplierApplyDuring,
+        fastingMultiplier: fasting,
+        iftarMultiplier: iftar,
       });
       setSuccess("Scoring settings updated.");
     } catch (err) {
@@ -936,13 +937,13 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
 
   return (
     <div className="stack">
-      <PanelCard title="Scoring Multiplier">
+      <PanelCard title="Timing Multipliers">
         <div className="form-grid">
           <label>
-            Multiplier value
+            Fasting multiplier
             <input
-              value={multiplierValue}
-              onChange={(e) => setMultiplierValue(e.target.value)}
+              value={fastingMultiplier}
+              onChange={(e) => setFastingMultiplier(e.target.value)}
               type="number"
               step="0.01"
               min={1}
@@ -950,14 +951,14 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
           </label>
 
           <label>
-            Apply multiplier during
-            <select
-              value={multiplierApplyDuring}
-              onChange={(e) => setMultiplierApplyDuring(e.target.value as "FASTING" | "IFTAR")}
-            >
-              <option value="IFTAR">Iftar time</option>
-              <option value="FASTING">Fasting time</option>
-            </select>
+            Iftar multiplier
+            <input
+              value={iftarMultiplier}
+              onChange={(e) => setIftarMultiplier(e.target.value)}
+              type="number"
+              step="0.01"
+              min={1}
+            />
           </label>
 
           <div className="form-grid__full inline-form">
@@ -1066,7 +1067,7 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
                   setField("categoryTagId", "");
                 }
               }}
-              placeholder="مثال: قرآن"
+              placeholder="Ù…Ø«Ø§Ù„: Ù‚Ø±Ø¢Ù†"
             />
           </label>
 
@@ -1662,3 +1663,9 @@ export function TasksModule({ tasks, counters, tags, onRefreshReferences }: Task
     </div>
   );
 }
+
+
+
+
+
+

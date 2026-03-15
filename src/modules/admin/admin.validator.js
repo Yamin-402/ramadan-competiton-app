@@ -10,7 +10,6 @@ const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOIC
 const dailyQuestionTopicSchema = z.enum(["ANY", "FIQH", "HADITH", "QURAN", "AQEEDAH", "SEERAH", "AKHLAQ"]);
 const dailyQuestionDifficultySchema = z.enum(["ANY", "EASY", "MEDIUM", "HARD"]);
 const adminRoleSchema = z.enum(["ADMIN", "SUPER_ADMIN"]);
-const scoringMultiplierTimingSchema = z.enum(["FASTING", "IFTAR"]);
 
 const adminPermissionsSchema = z.array(z.string().min(1)).max(50);
 const categoryTagSchema = z.object({
@@ -242,8 +241,8 @@ export const updateAdminAccessSchema = z.object({
 });
 
 export const updateScoringSettingsSchema = z.object({
-  multiplierValue: z.number().min(1).max(10),
-  applyDuring: scoringMultiplierTimingSchema,
+  fastingMultiplier: z.number().min(1).max(10),
+  iftarMultiplier: z.number().min(1).max(10),
 });
 
 export const updateAiAssistSettingsSchema = z
@@ -256,3 +255,4 @@ export const updateAiAssistSettingsSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required",
   });
+

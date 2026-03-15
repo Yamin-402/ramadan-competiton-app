@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
@@ -12,8 +12,8 @@ import { isStreakEnabledTask } from "../streaks/streaks.utils.js";
 
 const SCORING_MULTIPLIER_SETTING_KEY = "SCORING_MULTIPLIER";
 const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
-  value: 1.5,
-  applyDuring: "IFTAR",
+  fastingMultiplier: 1,
+  iftarMultiplier: 1.5,
 };
 
 function isCounterTask(task) {
@@ -553,22 +553,45 @@ async function resolveScoringMultiplierConfig() {
       ? row.value
       : null;
 
-  const rawValue = Number(settingValue?.value);
-  const multiplierValue =
-    Number.isFinite(rawValue) && rawValue >= 1 ? Number(rawValue.toFixed(2)) : DEFAULT_SCORING_MULTIPLIER_CONFIG.value;
+  const rawFasting = Number(settingValue?.fastingMultiplier);
+  const rawIftar = Number(settingValue?.iftarMultiplier);
+  const hasNew = Number.isFinite(rawFasting) || Number.isFinite(rawIftar);
 
-  const rawApplyDuring =
-    typeof settingValue?.applyDuring === "string"
-      ? settingValue.applyDuring.trim().toUpperCase()
-      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
-  const applyDuring =
-    rawApplyDuring === "FASTING" || rawApplyDuring === "IFTAR"
-      ? rawApplyDuring
-      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+  let fastingMultiplier =
+    Number.isFinite(rawFasting) && rawFasting >= 1
+      ? Number(rawFasting.toFixed(2))
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.fastingMultiplier;
+  let iftarMultiplier =
+    Number.isFinite(rawIftar) && rawIftar >= 1
+      ? Number(rawIftar.toFixed(2))
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.iftarMultiplier;
+
+  if (!hasNew) {
+    const legacyRaw = Number(settingValue?.value);
+    const legacyValue =
+      Number.isFinite(legacyRaw) && legacyRaw >= 1
+        ? Number(legacyRaw.toFixed(2))
+        : DEFAULT_SCORING_MULTIPLIER_CONFIG.iftarMultiplier;
+
+    const legacyApplyRaw =
+      typeof settingValue?.applyDuring === "string"
+        ? settingValue.applyDuring.trim().toUpperCase()
+        : "IFTAR";
+    const legacyApplyDuring =
+      legacyApplyRaw === "FASTING" || legacyApplyRaw === "IFTAR" ? legacyApplyRaw : "IFTAR";
+
+    if (legacyApplyDuring === "FASTING") {
+      fastingMultiplier = legacyValue;
+      iftarMultiplier = 1;
+    } else {
+      iftarMultiplier = legacyValue;
+      fastingMultiplier = 1;
+    }
+  }
 
   return {
-    value: multiplierValue,
-    applyDuring,
+    fastingMultiplier,
+    iftarMultiplier,
   };
 }
 
@@ -1020,9 +1043,9 @@ export const activitiesService = {
         ? payload.isDuringFasting
         : await isDuringFastingTime(occurredAt);
     const scoringMultiplierConfig = await resolveScoringMultiplierConfig();
-    const shouldApplyMultiplier =
-      scoringMultiplierConfig.applyDuring === "FASTING" ? isDuringFasting : !isDuringFasting;
-    const fastingMultiplier = shouldApplyMultiplier ? scoringMultiplierConfig.value : 1;
+    const fastingMultiplier = isDuringFasting
+      ? scoringMultiplierConfig.fastingMultiplier
+      : scoringMultiplierConfig.iftarMultiplier;
     const shouldApplyStreak = isStreakEnabledTask(task);
     const streakMultiplier = shouldApplyStreak
       ? await streaksService.getRewardMultiplierForNewActivity(userId, task.id, occurredAt)
@@ -1119,7 +1142,9 @@ export const activitiesService = {
         streakMultiplier,
         pointUnits,
         activityAmount: typeof payload.amount === "number" ? payload.amount : null,
-        scoringMultiplierApplyDuring: scoringMultiplierConfig.applyDuring,
+        scoringMultiplierFasting: scoringMultiplierConfig.fastingMultiplier,
+        scoringMultiplierIftar: scoringMultiplierConfig.iftarMultiplier,
+        scoringMultiplierApplied: fastingMultiplier,
         isDuringFastingOverride: typeof payload.isDuringFasting === "boolean",
       },
       isForbidden: task.type === "FORBIDDEN",
@@ -1191,3 +1216,7 @@ export const activitiesService = {
     return { counts };
   },
 };
+
+
+
+

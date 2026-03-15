@@ -152,8 +152,8 @@ export interface NotificationCampaignListItem {
 }
 
 export interface ScoringSettings {
-  multiplierValue: number;
-  applyDuring: "FASTING" | "IFTAR";
+  fastingMultiplier: number;
+  iftarMultiplier: number;
 }
 
 export interface AiAssistSettings {
@@ -318,3 +318,4 @@ export interface TaskCreatePayload {
     withinDays?: number;
   }>;
 }
+

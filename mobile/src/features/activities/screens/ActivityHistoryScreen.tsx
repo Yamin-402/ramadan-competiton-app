@@ -11,6 +11,7 @@ import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
+import { TranslationKey, translate } from "../../../i18n/strings";
 import { Activity } from "../../../types/domain";
 import { escapeHtml, exportPdfFromHtml, loadArabicFontBase64 } from "../../../utils/pdf-export";
 import { formatPoints } from "../../../utils/format";
@@ -73,6 +74,21 @@ function formatSignedPoints(value: number | string) {
   return "0";
 }
 
+function translateTemplate(
+  language: "ar" | "en",
+  key: TranslationKey,
+  params?: Record<string, string | number>
+) {
+  const template = translate(language, key);
+  if (!params) {
+    return template;
+  }
+
+  return Object.entries(params).reduce(
+    (acc, [name, value]) => acc.replace(new RegExp(`{{${name}}}`, "g"), String(value)),
+    template
+  );
+}
 function getActivityMetadata(item: Activity): Record<string, unknown> | null {
   if (!item.metadata || typeof item.metadata !== "object" || Array.isArray(item.metadata)) {
     return null;
@@ -516,79 +532,58 @@ export function ActivityHistoryScreen() {
     try {
       const isAr = language === "ar";
       const fontBase64 = isAr ? await loadArabicFontBase64() : null;
-      const labels = isAr
-        ? {
-            title: "سجل المهام",
-            generatedAt: "تاريخ التصدير",
-            overallTotal: "الإجمالي الكلي",
-            pointsGained: "النقاط المكتسبة",
-            pointsLost: "النقاط المفقودة",
-            dayTotal: "مجموع اليوم",
-            activities: "الأنشطة",
-            time: "الوقت",
-            task: "المهمة",
-            taskType: "نوع المهمة",
-            fasting: "التوقيت",
-            amount: "العدد",
-            points: "النقاط",
-            note: "ملاحظة",
-            fastingYes: "أثناء الصيام",
-            fastingNo: "إفطار",
-            minutes: "دقيقة",
-          }
-        : {
-            title: "Task History",
-            generatedAt: "Export date",
-            overallTotal: "Overall total",
-            pointsGained: "Points gained",
-            pointsLost: "Points lost",
-            dayTotal: "Day total",
-            activities: "Activities",
-            time: "Time",
-            task: "Task",
-            taskType: "Task type",
-            fasting: "Timing",
-            amount: "Amount",
-            points: "Points",
-            note: "Note",
-            fastingYes: "During fasting",
-            fastingNo: "Iftar",
-            minutes: "min",
-          };
+            const exportLanguage = isAr ? "ar" : "en";
+      const tExport = (key: TranslationKey, params?: Record<string, string | number>) =>
+        translateTemplate(exportLanguage, key, params);
+      const labels = {
+        title: tExport("activityHistory.title"),
+        generatedAt: tExport("common.exportedAt"),
+        overallTotal: tExport("activityHistory.overallTotal"),
+        pointsGained: tExport("activityHistory.pointsGained"),
+        pointsLost: tExport("activityHistory.pointsLost"),
+        dayTotal: tExport("activityHistory.dayTotal"),
+        activities: tExport("activityHistory.activities"),
+        time: tExport("activityHistory.time"),
+        task: tExport("activityHistory.taskLabel"),
+        taskType: tExport("activityHistory.taskType"),
+        timing: tExport("activityHistory.timingLabel"),
+        amount: tExport("activityHistory.amount"),
+        points: tExport("activityHistory.pointsLabel"),
+        note: tExport("activityHistory.note"),
+        fastingYes: tExport("activityHistory.duringFasting"),
+        fastingNo: tExport("activityHistory.outsideFasting"),
+        minutes: tExport("activityHistory.minutes"),
+      };
 
-      const typeLabel = (item: Activity) => {
+            const typeLabel = (item: Activity) => {
         if (item.type === "DAILY_QUESTION_ANSWER") {
-          return isAr ? "سؤال يومي" : "Daily question";
+          return tExport("activityHistory.dailyQuestion");
         }
         if (item.type === "MANUAL_ADJUSTMENT") {
-          return isAr ? "تعديل المشرف" : "Manual adjustment";
+          return tExport("activityHistory.manualAdjustment");
         }
         const snapshot = getTaskSnapshot(item);
         if (snapshot.flowType === "TIMED") {
-          return isAr ? "مؤقت" : "Timed";
+          return tExport("tasks.typeTimed");
         }
         if (snapshot.type === "COUNTER") {
-          return isAr ? "عداد" : "Counter";
+          return tExport("tasks.typeNumeric");
         }
         if (snapshot.type === "CONDITIONAL") {
-          return isAr ? "شرطي" : "Conditional";
+          return tExport("tasks.typeConditional");
         }
         if (snapshot.type === "FORBIDDEN") {
-          return isAr ? "ممنوع" : "Forbidden";
+          return tExport("tasks.categoryForbidden");
         }
-        return isAr ? "عادي" : "Normal";
+        return tExport("tasks.typeNormal");
       };
 
       const daySections = groupedDays
         .map((day) => {
           const dayLabel =
             day.ramadanDay > 0
-              ? isAr
-                ? `????? ${day.ramadanDay} ?? ?????`
-                : `Day ${day.ramadanDay} of Ramadan`
-              : isAr
-                ? `???????: ${day.key}`
-                : `Date: ${day.key}`;
+              ? tExport("activityHistory.ramadanDay", { day: day.ramadanDay })
+              : tExport("activityHistory.nonRamadanDay", { date: day.key });
 
           const rowsHtml = day.items
             .map((item) => {
@@ -615,14 +610,10 @@ export function ActivityHistoryScreen() {
                   : "-";
               const exportTitle =
                 item.type === "DAILY_QUESTION_ANSWER"
-                  ? isAr
-                    ? "سؤال يومي"
-                    : "Daily question"
+                  ? tExport("activityHistory.dailyQuestion")
                   : item.type === "MANUAL_ADJUSTMENT"
-                    ? isAr
-                      ? "تعديل المشرف"
-                      : "Manual adjustment"
-                    : snapshot.title || (isAr ? "مهمة" : "Task");
+                    ? tExport("activityHistory.manualAdjustment")
+                    : snapshot.title || tExport("activityHistory.taskEntry");
 
               return `
                 <tr>
@@ -648,7 +639,7 @@ export function ActivityHistoryScreen() {
                     <th>${escapeHtml(labels.time)}</th>
                     <th>${escapeHtml(labels.task)}</th>
                     <th>${escapeHtml(labels.taskType)}</th>
-                    <th>${escapeHtml(labels.fasting)}</th>
+                    <th>${escapeHtml(labels.timing)}</th>
                     <th>${escapeHtml(labels.amount)}</th>
                     <th>${escapeHtml(labels.points)}</th>
                     <th>${escapeHtml(labels.note)}</th>
@@ -724,32 +715,16 @@ export function ActivityHistoryScreen() {
       </Text>
       <View style={styles.exportRow}>
         <AppButton
-          label={
-            exporting
-              ? isArabic
-                ? "جاري التصدير..."
-                : "Exporting..."
-              : isArabic
-                ? "تصدير PDF (عربي)"
-                : "Export PDF (Arabic)"
-          }
+          label={exporting ? t("common.exporting") : t("common.exportPdfEnglish")}
           variant="ghost"
-          onPress={() => void handleExport("ar")}
+          onPress={() => void handleExport("en")}
           disabled={loading || groupedDays.length === 0 || exporting}
           style={styles.exportButton}
         />
         <AppButton
-          label={
-            exporting
-              ? isArabic
-                ? "جاري التصدير..."
-                : "Exporting..."
-              : isArabic
-                ? "تصدير PDF (إنجليزي)"
-                : "Export PDF (English)"
-          }
+          label={exporting ? t("common.exporting") : t("common.exportPdfArabic")}
           variant="ghost"
-          onPress={() => void handleExport("en")}
+          onPress={() => void handleExport("ar")}
           disabled={loading || groupedDays.length === 0 || exporting}
           style={styles.exportButton}
         />
@@ -1068,3 +1043,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+
+
+
+
+
+
+

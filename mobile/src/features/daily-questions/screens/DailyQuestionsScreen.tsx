@@ -12,7 +12,7 @@ import { LoadingBlock } from "../../../components/LoadingBlock";
 import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
-import { useSettingsStore } from "../../../store/settings-store";
+import { useSettingsStore } from "../../../store/settings-store";`r`nimport { TranslationKey, translate } from "../../../i18n/strings";
 import { DailyQuestion, DailyQuestionHistoryItem } from "../../../types/domain";
 import { escapeHtml, exportPdfFromHtml, loadArabicFontBase64 } from "../../../utils/pdf-export";
 import { formatPoints } from "../../../utils/format";
@@ -25,6 +25,21 @@ interface DayHistoryGroup {
   items: DailyQuestionHistoryItem[];
 }
 
+function translateTemplate(
+  language: "ar" | "en",
+  key: TranslationKey,
+  params?: Record<string, string | number>
+) {
+  const template = translate(language, key);
+  if (!params) {
+    return template;
+  }
+
+  return Object.entries(params).reduce(
+    (acc, [name, value]) => acc.replace(new RegExp(`{{${name}}}`, "g"), String(value)),
+    template
+  );
+}
 function isTodayAnswered(
   todayQuestion: DailyQuestion | null,
   history: DailyQuestionHistoryItem[]
@@ -350,48 +365,34 @@ export function DailyQuestionsScreen() {
     try {
       const isAr = language === "ar";
       const fontBase64 = isAr ? await loadArabicFontBase64() : null;
-      const labels = isAr
-        ? {
-            title: "سجل الأسئلة اليومية",
-            generatedAt: "تاريخ التصدير",
-            dayPrefix: "اليوم",
-            daySuffix: "من رمضان",
-            question: "السؤال",
-            status: "الحالة",
-            yourAnswer: "إجابتك",
-            correctAnswer: "الإجابة الصحيحة",
-            explanation: "التفسير",
-            points: "النقاط",
-            notAnswered: "لم يتم الإجابة",
-            revealLater: "يظهر بعد الفجر",
-          }
-        : {
-            title: "Daily Questions History",
-            generatedAt: "Export date",
-            dayPrefix: "Day",
-            daySuffix: "of Ramadan",
-            question: "Question",
-            status: "Status",
-            yourAnswer: "Your answer",
-            correctAnswer: "Correct answer",
-            explanation: "Explanation",
-            points: "Points",
-            notAnswered: "Not answered",
-            revealLater: "Reveals after Fajr",
-          };
+            const exportLanguage = isAr ? "ar" : "en";
+      const tExport = (key: TranslationKey, params?: Record<string, string | number>) =>
+        translateTemplate(exportLanguage, key, params);
+      const labels = {
+        title: tExport("daily.exportTitle"),
+        generatedAt: tExport("common.exportedAt"),
+        question: tExport("daily.questionLabel"),
+        status: tExport("daily.statusLabel"),
+        yourAnswer: tExport("daily.yourAnswerLabel"),
+        correctAnswer: tExport("daily.correctAnswerLabel"),
+        explanation: tExport("daily.explanationLabel"),
+        points: tExport("daily.points"),
+        notAnswered: tExport("daily.notAnswered"),
+        revealLater: tExport("daily.revealLater"),
+      };
 
       const sectionsHtml = groupedHistory
         .map((group) => {
-          const dayLabel = `${labels.dayPrefix} ${group.ramadanDay} ${labels.daySuffix}`;
+          const dayLabel = tExport("daily.ramadanDay", { day: group.ramadanDay });
           const rowsHtml = group.items
             .map((item) => {
-              const statusLabel = getHistoryStatusLabel(item, t);
+              const statusLabel = getHistoryStatusLabel(item, tExport);
               const yourAnswer = item.didAnswer
-                ? formatAnswerForDisplay(item.answer, t)
+                ? formatAnswerForDisplay(item.answer, tExport)
                 : labels.notAnswered;
               const correctAnswer =
                 item.status === "revealed"
-                  ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
+                  ? formatAnswerForDisplay(item.questionCorrectAnswer, tExport)
                   : labels.revealLater;
               const explanation =
                 item.status === "revealed"
@@ -677,32 +678,16 @@ export function DailyQuestionsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>{t("daily.history")}</Text>
           <View style={styles.exportRow}>
             <AppButton
-              label={
-                exporting
-                  ? isArabic
-                    ? "جاري التصدير..."
-                    : "Exporting..."
-                  : isArabic
-                    ? "تصدير PDF (عربي)"
-                    : "Export PDF (Arabic)"
-              }
+              label={exporting ? t("common.exporting") : t("common.exportPdfEnglish")}
               variant="ghost"
-              onPress={() => void handleExportHistory("ar")}
+              onPress={() => void handleExportHistory("en")}
               disabled={groupedHistory.length === 0 || exporting}
               style={styles.exportButton}
             />
             <AppButton
-              label={
-                exporting
-                  ? isArabic
-                    ? "جاري التصدير..."
-                    : "Exporting..."
-                  : isArabic
-                    ? "تصدير PDF (إنجليزي)"
-                    : "Export PDF (English)"
-              }
+              label={exporting ? t("common.exporting") : t("common.exportPdfArabic")}
               variant="ghost"
-              onPress={() => void handleExportHistory("en")}
+              onPress={() => void handleExportHistory("ar")}
               disabled={groupedHistory.length === 0 || exporting}
               style={styles.exportButton}
             />
@@ -775,7 +760,7 @@ export function DailyQuestionsScreen() {
                               },
                             ]}
                           >
-                            {getHistoryStatusLabel(item, t)}
+                            {getHistoryStatusLabel(item, tExport)}
                           </Text>
 
                           <View style={[styles.answerBlock, { borderColor: colors.border }]}>
@@ -784,7 +769,7 @@ export function DailyQuestionsScreen() {
                             </Text>
                             <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
                               {item.didAnswer
-                                ? formatAnswerForDisplay(item.answer, t)
+                                ? formatAnswerForDisplay(item.answer, tExport)
                                 : t("daily.notAnswered")}
                             </Text>
                           </View>
@@ -795,7 +780,7 @@ export function DailyQuestionsScreen() {
                             </Text>
                             <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
                               {item.status === "revealed"
-                                ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
+                                ? formatAnswerForDisplay(item.questionCorrectAnswer, tExport)
                                 : t("daily.revealLater")}
                             </Text>
                             {item.status === "revealed" &&
@@ -943,3 +928,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+
+
+
+

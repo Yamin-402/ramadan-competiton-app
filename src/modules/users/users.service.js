@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { generateUserProgressReportWithAi } from "../../integrations/ai-assistant/ai-assistant.client.js";
@@ -7,8 +7,8 @@ import { usersRepository } from "./users.repository.js";
 const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
   enabled: false,
-  baseUrl: "https://ramadan-ai.fly.dev",
-  model: "qwen2.5:3b-instruct",
+  baseUrl: "https://api.groq.com/openai/v1",
+  model: "llama-3.1-8b-instant",
   timeoutMs: 25000,
 };
 
@@ -270,27 +270,27 @@ function toShortList(items, limit) {
 function buildFallbackReport(profile, analytics, options) {
   const isArabic = options.language === "AR";
   const shortName = (profile.displayName || profile.email || "").trim().split(" ")[0] || "";
-  const greetingName = shortName ? `${isArabic ? "يا" : ""} ${shortName}`.trim() : "";
+  const greetingName = shortName ? `${isArabic ? "ÙŠØ§" : ""} ${shortName}`.trim() : "";
 
   const highlights = [];
   if (analytics.totals.totalActivities > 0) {
     highlights.push(
       isArabic
-        ? `أنجزت ${analytics.totals.totalActivities} نشاط في آخر ${analytics.totals.lookbackDays} يوم.`
+        ? `Ø£Ù†Ø¬Ø²Øª ${analytics.totals.totalActivities} Ù†Ø´Ø§Ø· ÙÙŠ Ø¢Ø®Ø± ${analytics.totals.lookbackDays} ÙŠÙˆÙ….`
         : `You completed ${analytics.totals.totalActivities} activities in the last ${analytics.totals.lookbackDays} days.`
     );
   }
   if (options.includeTiming) {
     highlights.push(
       isArabic
-        ? `تسجيلات الصيام: ${analytics.timing.fastingCount} | الإفطار: ${analytics.timing.iftarCount}.`
+        ? `ØªØ³Ø¬ÙŠÙ„Ø§Øª Ø§Ù„ØµÙŠØ§Ù…: ${analytics.timing.fastingCount} | Ø§Ù„Ø¥ÙØ·Ø§Ø±: ${analytics.timing.iftarCount}.`
         : `Fasting logs: ${analytics.timing.fastingCount} | Iftar logs: ${analytics.timing.iftarCount}.`
     );
   }
   if (options.includeDailyQuestions) {
     highlights.push(
       isArabic
-        ? `إجابات السؤال اليومي: ${analytics.dailyQuestions.answered} بدقة ${analytics.dailyQuestions.accuracy}%.`
+        ? `Ø¥Ø¬Ø§Ø¨Ø§Øª Ø§Ù„Ø³Ø¤Ø§Ù„ Ø§Ù„ÙŠÙˆÙ…ÙŠ: ${analytics.dailyQuestions.answered} Ø¨Ø¯Ù‚Ø© ${analytics.dailyQuestions.accuracy}%.`
         : `Daily questions: ${analytics.dailyQuestions.answered} answered with ${analytics.dailyQuestions.accuracy}% accuracy.`
     );
   }
@@ -298,14 +298,14 @@ function buildFallbackReport(profile, analytics, options) {
     const top = analytics.topTasks[0];
     highlights.push(
       isArabic
-        ? `أكثر مهمة التزمت بها: ${top.taskTitle} (${top.count} مرات).`
+        ? `Ø£ÙƒØ«Ø± Ù…Ù‡Ù…Ø© Ø§Ù„ØªØ²Ù…Øª Ø¨Ù‡Ø§: ${top.taskTitle} (${top.count} Ù…Ø±Ø§Øª).`
         : `Most repeated task: ${top.taskTitle} (${top.count} times).`
     );
   }
   if (options.includeStreaks) {
     highlights.push(
       isArabic
-        ? `أفضل استمرارية حالية: ${analytics.streaks.bestCurrentStreak} يوم.`
+        ? `Ø£ÙØ¶Ù„ Ø§Ø³ØªÙ…Ø±Ø§Ø±ÙŠØ© Ø­Ø§Ù„ÙŠØ©: ${analytics.streaks.bestCurrentStreak} ÙŠÙˆÙ….`
         : `Best current streak: ${analytics.streaks.bestCurrentStreak} days.`
     );
   }
@@ -313,40 +313,40 @@ function buildFallbackReport(profile, analytics, options) {
   const actionPlan = [];
   actionPlan.push(
     isArabic
-      ? "ثبت مهمتين أساسيتين يوميًا والتزم بهم في نفس الوقت."
+      ? "Ø«Ø¨Øª Ù…Ù‡Ù…ØªÙŠÙ† Ø£Ø³Ø§Ø³ÙŠØªÙŠÙ† ÙŠÙˆÙ…ÙŠÙ‹Ø§ ÙˆØ§Ù„ØªØ²Ù… Ø¨Ù‡Ù… ÙÙŠ Ù†ÙØ³ Ø§Ù„ÙˆÙ‚Øª."
       : "Lock two core daily tasks and keep them at fixed times."
   );
   if (options.focusMode === "COMPARISON" || options.focusMode === "BOTH") {
     actionPlan.push(
       isArabic
-        ? "راجع الأيام الضعيفة وابدأ فيها بمهام بسيطة جدًا لرفع المتوسط."
+        ? "Ø±Ø§Ø¬Ø¹ Ø§Ù„Ø£ÙŠØ§Ù… Ø§Ù„Ø¶Ø¹ÙŠÙØ© ÙˆØ§Ø¨Ø¯Ø£ ÙÙŠÙ‡Ø§ Ø¨Ù…Ù‡Ø§Ù… Ø¨Ø³ÙŠØ·Ø© Ø¬Ø¯Ù‹Ø§ Ù„Ø±ÙØ¹ Ø§Ù„Ù…ØªÙˆØ³Ø·."
         : "Review weak days and start with very simple tasks to raise your average."
     );
   }
   actionPlan.push(
     isArabic
-      ? "استخدم السؤال اليومي كعادة ثابتة قبل نهاية اليوم."
+      ? "Ø§Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø³Ø¤Ø§Ù„ Ø§Ù„ÙŠÙˆÙ…ÙŠ ÙƒØ¹Ø§Ø¯Ø© Ø«Ø§Ø¨ØªØ© Ù‚Ø¨Ù„ Ù†Ù‡Ø§ÙŠØ© Ø§Ù„ÙŠÙˆÙ…."
       : "Use the daily question as a fixed habit before day end."
   );
 
   const title = isArabic
-    ? `تقرير تقدمك ${greetingName}`.trim()
+    ? `ØªÙ‚Ø±ÙŠØ± ØªÙ‚Ø¯Ù…Ùƒ ${greetingName}`.trim()
     : `Your Progress Report ${greetingName}`.trim();
   const summary = isArabic
-    ? `مجموع نقاطك خلال الفترة هو ${analytics.totals.totalPoints} مع نشاط في ${analytics.totals.activeDays} يوم. المتوسط اليومي ${analytics.totals.averagePointsPerActiveDay} نقطة.`
+    ? `Ù…Ø¬Ù…ÙˆØ¹ Ù†Ù‚Ø§Ø·Ùƒ Ø®Ù„Ø§Ù„ Ø§Ù„ÙØªØ±Ø© Ù‡Ùˆ ${analytics.totals.totalPoints} Ù…Ø¹ Ù†Ø´Ø§Ø· ÙÙŠ ${analytics.totals.activeDays} ÙŠÙˆÙ…. Ø§Ù„Ù…ØªÙˆØ³Ø· Ø§Ù„ÙŠÙˆÙ…ÙŠ ${analytics.totals.averagePointsPerActiveDay} Ù†Ù‚Ø·Ø©.`
     : `Your total points in this period are ${analytics.totals.totalPoints}, with activity on ${analytics.totals.activeDays} days. Daily average is ${analytics.totals.averagePointsPerActiveDay} points.`;
   const comparison =
     options.focusMode === "SUMMARY"
       ? isArabic
-        ? "وضعك الحالي واضح، ركز على الثبات اليومي أكثر من الكمية."
+        ? "ÙˆØ¶Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ ÙˆØ§Ø¶Ø­ØŒ Ø±ÙƒØ² Ø¹Ù„Ù‰ Ø§Ù„Ø«Ø¨Ø§Øª Ø§Ù„ÙŠÙˆÙ…ÙŠ Ø£ÙƒØ«Ø± Ù…Ù† Ø§Ù„ÙƒÙ…ÙŠØ©."
         : "Your current picture is clear; focus on consistency more than volume."
       : isArabic
-        ? `متوسط النصف الأول ${analytics.comparison.firstHalfAveragePoints} نقطة مقابل ${analytics.comparison.secondHalfAveragePoints} للنصف الثاني (فرق ${analytics.comparison.trendDelta}).`
+        ? `Ù…ØªÙˆØ³Ø· Ø§Ù„Ù†ØµÙ Ø§Ù„Ø£ÙˆÙ„ ${analytics.comparison.firstHalfAveragePoints} Ù†Ù‚Ø·Ø© Ù…Ù‚Ø§Ø¨Ù„ ${analytics.comparison.secondHalfAveragePoints} Ù„Ù„Ù†ØµÙ Ø§Ù„Ø«Ø§Ù†ÙŠ (ÙØ±Ù‚ ${analytics.comparison.trendDelta}).`
         : `First-half average is ${analytics.comparison.firstHalfAveragePoints} points vs ${analytics.comparison.secondHalfAveragePoints} in second half (delta ${analytics.comparison.trendDelta}).`;
   const motivation = isArabic
     ? options.tone === "STRICT"
-      ? "النتيجة تتحسن بالالتزام اليومي. قلل التشتت وركز على تنفيذ خطة ثابتة."
-      : "مستواك قابل للتحسن بسرعة. خطوة صغيرة ثابتة كل يوم هتفرق جدًا."
+      ? "Ø§Ù„Ù†ØªÙŠØ¬Ø© ØªØªØ­Ø³Ù† Ø¨Ø§Ù„Ø§Ù„ØªØ²Ø§Ù… Ø§Ù„ÙŠÙˆÙ…ÙŠ. Ù‚Ù„Ù„ Ø§Ù„ØªØ´ØªØª ÙˆØ±ÙƒØ² Ø¹Ù„Ù‰ ØªÙ†ÙÙŠØ° Ø®Ø·Ø© Ø«Ø§Ø¨ØªØ©."
+      : "Ù…Ø³ØªÙˆØ§Ùƒ Ù‚Ø§Ø¨Ù„ Ù„Ù„ØªØ­Ø³Ù† Ø¨Ø³Ø±Ø¹Ø©. Ø®Ø·ÙˆØ© ØµØºÙŠØ±Ø© Ø«Ø§Ø¨ØªØ© ÙƒÙ„ ÙŠÙˆÙ… Ù‡ØªÙØ±Ù‚ Ø¬Ø¯Ù‹Ø§."
     : options.tone === "STRICT"
       ? "Results improve with daily discipline. Reduce distractions and execute a steady plan."
       : "Your level can improve quickly. One small consistent step every day will make a big difference.";
@@ -537,3 +537,5 @@ export const usersService = {
     };
   },
 };
+
+

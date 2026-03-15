@@ -1,3 +1,5 @@
+﻿import { env } from "../../core/config/env.js";
+
 function toSafeBaseUrl(baseUrl) {
   const normalized = String(baseUrl || "").trim().replace(/\/+$/, "");
   if (!normalized) {
@@ -26,7 +28,15 @@ function extractJsonObject(value) {
   throw new Error("AI response is not valid JSON");
 }
 
-async function callOllamaJson(config, prompt) {
+function resolveApiKey() {
+  const apiKey = String(env.aiApiKey || "").trim();
+  if (!apiKey) {
+    throw new Error("AI API key is missing");
+  }
+  return apiKey;
+}
+
+async function callGroqJson(config, prompt) {
   const baseUrl = toSafeBaseUrl(config.baseUrl);
   const timeoutMs = Number.isFinite(Number(config.timeoutMs))
     ? Math.max(5000, Math.min(90000, Number(config.timeoutMs)))
@@ -40,29 +50,39 @@ async function callOllamaJson(config, prompt) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${baseUrl}/api/generate`, {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        authorization: `Bearer ${resolveApiKey()}`,
       },
       body: JSON.stringify({
         model,
-        stream: false,
-        format: "json",
-        prompt,
-        options: {
-          temperature: 0.2,
-        },
+        temperature: 0.2,
+        max_tokens: 800,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a careful assistant. Always return JSON only with no markdown, no extra text.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
       }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      throw new Error(`AI server returned ${response.status}`);
+      const detail = await response.text().catch(() => "");
+      throw new Error(`AI server returned ${response.status}${detail ? `: ${detail}` : ""}`);
     }
 
     const payload = await response.json();
-    return extractJsonObject(payload?.response);
+    const content = payload?.choices?.[0]?.message?.content ?? payload?.choices?.[0]?.text ?? "";
+    return extractJsonObject(content);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -88,7 +108,7 @@ export async function rewriteDailyQuestionSuggestionWithAi(config, context) {
     'JSON shape: {"questionText":"...","correctAnswer":"...","answerExplanation":"...","options":[],"topic":"FIQH","difficulty":"EASY"}',
   ].join("\n");
 
-  return callOllamaJson(config, prompt);
+  return callGroqJson(config, prompt);
 }
 
 export async function generateDailyQuestionSuggestionWithAi(config, context) {
@@ -110,7 +130,7 @@ export async function generateDailyQuestionSuggestionWithAi(config, context) {
     'JSON shape: {"questionText":"...","correctAnswer":"...","answerExplanation":"...","options":[],"topic":"FIQH","difficulty":"EASY"}',
   ].join("\n");
 
-  return callOllamaJson(config, prompt);
+  return callGroqJson(config, prompt);
 }
 
 export async function generateMotivationMessageWithAi(config, context) {
@@ -126,7 +146,7 @@ export async function generateMotivationMessageWithAi(config, context) {
     'JSON shape: {"title":"...","body":"..."}',
   ].join("\n");
 
-  return callOllamaJson(config, prompt);
+  return callGroqJson(config, prompt);
 }
 
 export async function generateUserProgressReportWithAi(config, context) {
@@ -149,5 +169,5 @@ export async function generateUserProgressReportWithAi(config, context) {
     'JSON shape: {"title":"...","summary":"...","highlights":["..."],"comparison":"...","actionPlan":["..."],"motivation":"..."}',
   ].join("\n");
 
-  return callOllamaJson(config, prompt);
+  return callGroqJson(config, prompt);
 }

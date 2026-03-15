@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
@@ -15,14 +15,14 @@ import { adminRepository } from "./admin.repository.js";
 
 const SCORING_MULTIPLIER_SETTING_KEY = "SCORING_MULTIPLIER";
 const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
-  multiplierValue: 1.5,
-  applyDuring: "IFTAR",
+  fastingMultiplier: 1,
+  iftarMultiplier: 1.5,
 };
 const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
   enabled: false,
-  baseUrl: "https://ramadan-ai.fly.dev",
-  model: "qwen2.5:3b-instruct",
+  baseUrl: "https://api.groq.com/openai/v1",
+  model: "llama-3.1-8b-instant",
   timeoutMs: 25000,
 };
 
@@ -410,24 +410,46 @@ function normalizeDailyQuestionPayload(payload) {
 function normalizeScoringSettingsValue(value) {
   const settingValue =
     value && typeof value === "object" && !Array.isArray(value) ? value : null;
-  const rawMultiplier = Number(settingValue?.value ?? settingValue?.multiplierValue);
-  const multiplierValue =
-    Number.isFinite(rawMultiplier) && rawMultiplier >= 1
-      ? Number(rawMultiplier.toFixed(2))
-      : DEFAULT_SCORING_MULTIPLIER_CONFIG.multiplierValue;
 
-  const rawApplyDuring =
-    typeof settingValue?.applyDuring === "string"
-      ? settingValue.applyDuring.trim().toUpperCase()
-      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
-  const applyDuring =
-    rawApplyDuring === "FASTING" || rawApplyDuring === "IFTAR"
-      ? rawApplyDuring
-      : DEFAULT_SCORING_MULTIPLIER_CONFIG.applyDuring;
+  const rawFasting = Number(settingValue?.fastingMultiplier);
+  const rawIftar = Number(settingValue?.iftarMultiplier);
+  const hasNew = Number.isFinite(rawFasting) || Number.isFinite(rawIftar);
+
+  let fastingMultiplier =
+    Number.isFinite(rawFasting) && rawFasting >= 1
+      ? Number(rawFasting.toFixed(2))
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.fastingMultiplier;
+  let iftarMultiplier =
+    Number.isFinite(rawIftar) && rawIftar >= 1
+      ? Number(rawIftar.toFixed(2))
+      : DEFAULT_SCORING_MULTIPLIER_CONFIG.iftarMultiplier;
+
+  if (!hasNew) {
+    const legacyRaw = Number(settingValue?.value ?? settingValue?.multiplierValue);
+    const legacyValue =
+      Number.isFinite(legacyRaw) && legacyRaw >= 1
+        ? Number(legacyRaw.toFixed(2))
+        : DEFAULT_SCORING_MULTIPLIER_CONFIG.iftarMultiplier;
+
+    const legacyApplyRaw =
+      typeof settingValue?.applyDuring === "string"
+        ? settingValue.applyDuring.trim().toUpperCase()
+        : "IFTAR";
+    const legacyApplyDuring =
+      legacyApplyRaw === "FASTING" || legacyApplyRaw === "IFTAR" ? legacyApplyRaw : "IFTAR";
+
+    if (legacyApplyDuring === "FASTING") {
+      fastingMultiplier = legacyValue;
+      iftarMultiplier = 1;
+    } else {
+      iftarMultiplier = legacyValue;
+      fastingMultiplier = 1;
+    }
+  }
 
   return {
-    multiplierValue,
-    applyDuring,
+    fastingMultiplier,
+    iftarMultiplier,
   };
 }
 
@@ -1941,8 +1963,8 @@ export const adminService = {
   async updateScoringSettings(auth, payload) {
     const adminId = getAuthUserId(auth);
     const value = {
-      value: Number(payload.multiplierValue.toFixed(2)),
-      applyDuring: payload.applyDuring,
+      fastingMultiplier: Number(payload.fastingMultiplier.toFixed(2)),
+      iftarMultiplier: Number(payload.iftarMultiplier.toFixed(2)),
     };
 
     const updated = await adminRepository.upsertAppSetting(
@@ -1955,7 +1977,7 @@ export const adminService = {
       action: "UPDATE_SCORING_SETTINGS",
       entityType: "APP_SETTING",
       entityId: SCORING_MULTIPLIER_SETTING_KEY,
-      summary: `Updated scoring multiplier to ${value.value} on ${value.applyDuring}`,
+      summary: `Updated scoring multipliers (fasting: ${value.fastingMultiplier}, iftar: ${value.iftarMultiplier})`,
       payload: value,
     });
 
@@ -1996,3 +2018,8 @@ export const adminService = {
     return normalizeAiAssistSettingsValue(updated?.value);
   },
 };
+
+
+
+
+

@@ -202,3 +202,7 @@ time=2026-03-14T05:39:01.815Z level=INFO source=runner.go:67 msg="discovering av
 05:39:11
  INFO Starting init (commit: 350f2667)...")
  and downloading the user images still gives "could not download image", while the export arabic still gives "?" in the days title of the tasks
+
+
+ $2b$10$1FkfMtXG8sBMXy5sB.jEcObw2FxPGzESuXcI4cYeZdvTkJsr3gVMm (old ahmed pass)
+ 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 (groq ai api key)

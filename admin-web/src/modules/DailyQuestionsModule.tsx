@@ -151,8 +151,8 @@ export function DailyQuestionsModule() {
   const [suggestionDifficulty, setSuggestionDifficulty] = useState<DailyQuestionDifficulty>("ANY");
   const [aiSettings, setAiSettings] = useState<AiAssistSettings>({
     enabled: false,
-    baseUrl: "https://ramadan-ai.fly.dev",
-    model: "qwen2.5:3b-instruct",
+    baseUrl: "https://api.groq.com/openai/v1",
+    model: "llama-3.1-8b-instant",
     timeoutMs: 25000,
   });
   const [loadingAiSettings, setLoadingAiSettings] = useState(false);
@@ -635,7 +635,7 @@ export function DailyQuestionsModule() {
                   onChange={(event) =>
                     setAiSettings((prev) => ({ ...prev, baseUrl: event.target.value }))
                   }
-                  placeholder="https://ramadan-ai.fly.dev"
+                  placeholder="https://api.groq.com/openai/v1"
                 />
               </label>
               <label>
@@ -995,3 +995,5 @@ export function DailyQuestionsModule() {
     </div>
   );
 }
+
+
