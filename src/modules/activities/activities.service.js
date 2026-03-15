@@ -2,9 +2,9 @@
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
+import { competitionService } from "../competition/competition.service.js";
 import {
   getOrCreateFastingWindow,
-import { competitionService } from "../competition/competition.service.js";
   isDuringFastingTime,
 } from "../../integrations/prayer-times/prayer-time.service.js";
 import { activitiesRepository } from "./activities.repository.js";
