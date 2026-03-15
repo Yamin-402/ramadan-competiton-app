@@ -8,6 +8,7 @@ import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useAuthStore } from "../../../store/auth-store";
 import { useSettingsStore } from "../../../store/settings-store";
+import { useCompetitionStore } from "../../../store/competition-store";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreMenu">;
 
@@ -16,12 +17,16 @@ export function MoreMenuScreen({ navigation }: Props) {
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const user = useAuthStore((state) => state.user);
+  const competition = useCompetitionStore((state) => state.state);
   const textAlign = isArabic ? "right" : "left";
   const chevron = isArabic ? "chevron-back" : "chevron-forward";
+  const showWinners = Boolean(competition && competition.isOpen === false);
   const menu = [
     { route: "Guide", label: t("more.guide"), icon: "help-circle-outline" },
     { route: "Leaderboard", label: t("more.leaderboard"), icon: "trophy-outline" },
-    { route: "CompetitionWinners", label: t("more.winners"), icon: "medal-outline" },
+    ...(showWinners
+      ? [{ route: "CompetitionWinners", label: t("more.winners"), icon: "medal-outline" }]
+      : []),
     { route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
     { route: "Notifications", label: t("more.notifications"), icon: "notifications-outline" },
     { route: "Money", label: t("more.money"), icon: "cash-outline" },

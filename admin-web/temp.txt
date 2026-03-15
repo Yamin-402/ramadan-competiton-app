@@ -206,3 +206,5 @@ time=2026-03-14T05:39:01.815Z level=INFO source=runner.go:67 msg="discovering av
 
  $2b$10$1FkfMtXG8sBMXy5sB.jEcObw2FxPGzESuXcI4cYeZdvTkJsr3gVMm (old ahmed pass)
  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 (groq ai api key)
+
+ look, the ai report still shows 0 point, please make a full reveiw to check the problem and solve it, and for the competetion, The winner page aren't working, and when I close the app and choose winners nothing, get closed, and winners in admin panel are assigned with 0 points while they have real points, and either the popup doesn't work, and the winner page should be hidden until the competetion are closed. i tried now the ai suggestion, it was very very bad, question not goood and answers are short and not clear at all, please enhance it alot.

@@ -484,6 +484,8 @@ function toSuggestionBase(entry, answerType) {
     questionText: truncateText(entry.question, 210),
     answerType,
     answerExplanation: toShortExplanation(entry.answer),
+    // Extra context for AI rewriting (not returned to clients after normalization).
+    rawAnswer: truncateText(entry.answer, 1500),
     topic,
     difficulty,
   };

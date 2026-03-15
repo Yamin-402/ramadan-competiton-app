@@ -8,7 +8,7 @@ const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
   enabled: Boolean(env.aiApiKey),
   baseUrl: "https://api.groq.com/openai/v1",
-  model: "llama-3.1-8b-instant",
+  model: "llama-3.1-70b-versatile",
   timeoutMs: 25000,
 };
 
@@ -132,7 +132,7 @@ function buildAnalytics(activities, streaks, options) {
 
   for (const row of activities) {
     const occurredAt = new Date(row.occurredAt);
-    const dayKey = row.competitionDate || getCairoDateKey(occurredAt);
+    const dayKey = getCairoDateKey(occurredAt);
     const weekday = getCairoWeekday(occurredAt, options.language);
     const effectivePoints = toNumber(row.effectivePoints);
 
@@ -275,6 +275,34 @@ function buildAnalytics(activities, streaks, options) {
     topTasks,
     weekdayDistribution,
     forbiddenCount,
+  };
+}
+
+function buildTotalsSnapshotByType(rows) {
+  const byType = {};
+  let totalActivities = 0;
+  let totalPoints = 0;
+
+  if (!Array.isArray(rows)) {
+    return { totalActivities: 0, totalPoints: 0, byType };
+  }
+
+  for (const row of rows) {
+    const type = String(row?.type || "").trim();
+    const count = Number(row?._count?._all || 0);
+    const points = toNumber(row?._sum?.effectivePoints || 0);
+    if (!type) {
+      continue;
+    }
+    byType[type] = { count, points: Number(points.toFixed(2)) };
+    totalActivities += count;
+    totalPoints += points;
+  }
+
+  return {
+    totalActivities,
+    totalPoints: Number(totalPoints.toFixed(2)),
+    byType,
   };
 }
 
@@ -518,36 +546,48 @@ export const usersService = {
     let activities = [];
     let streaks = [];
     let aiSettings = DEFAULT_AI_ASSIST_SETTINGS;
+    let totalsByTypeRows = [];
+    const fromDate = new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000);
+
     try {
-      const fromDate = new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000);
-      const [activitiesResult, streaksResult, aiSettingsResult] = await Promise.all([
-        usersRepository.listActivitiesForReport(userId, fromDate),
-        usersRepository.listStreaksForUser(userId),
-        readAiAssistSettings(),
-      ]);
-      activities = activitiesResult || [];
-      streaks = streaksResult || [];
-      aiSettings = aiSettingsResult || DEFAULT_AI_ASSIST_SETTINGS;
-      if (activities.length === 0) {
-        try {
-          const fallbackFromDate = profile.createdAt ? new Date(profile.createdAt) : new Date(0);
-          activities = await usersRepository.listActivitiesForReport(userId, fallbackFromDate);
-        } catch {
-          activities = [];
-        }
-      }
-      if (activities.length === 0) {
-        try {
-          activities = await usersRepository.listActivitiesForReportAny(userId);
-        } catch {
-          activities = [];
-        }
-      }
+      activities = (await usersRepository.listActivitiesForReport(userId, fromDate)) || [];
     } catch {
-      // fallback to empty analytics if data fetch fails
       activities = [];
+    }
+
+    try {
+      streaks = (await usersRepository.listStreaksForUser(userId)) || [];
+    } catch {
       streaks = [];
+    }
+
+    try {
+      aiSettings = (await readAiAssistSettings()) || DEFAULT_AI_ASSIST_SETTINGS;
+    } catch {
       aiSettings = DEFAULT_AI_ASSIST_SETTINGS;
+    }
+
+    if (activities.length === 0) {
+      try {
+        const fallbackFromDate = profile.createdAt ? new Date(profile.createdAt) : new Date(0);
+        activities = await usersRepository.listActivitiesForReport(userId, fallbackFromDate);
+      } catch {
+        activities = [];
+      }
+    }
+
+    if (activities.length === 0) {
+      try {
+        activities = await usersRepository.listActivitiesForReportAny(userId);
+      } catch {
+        activities = [];
+      }
+    }
+
+    try {
+      totalsByTypeRows = await usersRepository.getActivityTotalsByType(userId);
+    } catch {
+      totalsByTypeRows = [];
     }
 
     let analytics;
@@ -555,6 +595,17 @@ export const usersService = {
       analytics = buildAnalytics(activities, streaks, options);
     } catch {
       analytics = buildAnalytics([], [], options);
+    }
+
+    if (analytics.totals.totalActivities === 0) {
+      const snapshot = buildTotalsSnapshotByType(totalsByTypeRows);
+      if (snapshot.totalActivities > 0) {
+        analytics.totals.totalActivities = snapshot.totalActivities;
+        analytics.totals.totalPoints = snapshot.totalPoints;
+        analytics.totals.taskCompletionCount = snapshot.byType.TASK_COMPLETION?.count || 0;
+        analytics.totals.manualAdjustmentCount = snapshot.byType.MANUAL_ADJUSTMENT?.count || 0;
+        analytics.dailyQuestions.answered = snapshot.byType.DAILY_QUESTION_ANSWER?.count || 0;
+      }
     }
 
     const report = await maybeGenerateReportWithAi(aiSettings, profile, analytics, options);

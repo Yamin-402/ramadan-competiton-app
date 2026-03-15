@@ -14,6 +14,7 @@ export function CompetitionWinnersScreen() {
   const { t, isArabic } = useI18n();
   const competition = useCompetitionStore((state) => state.state);
   const loading = useCompetitionStore((state) => state.loading);
+  const error = useCompetitionStore((state) => state.error);
   const load = useCompetitionStore((state) => state.load);
   const textAlign = isArabic ? "right" : "left";
   const isClosed = competition ? !competition.isOpen : false;
@@ -38,14 +39,18 @@ export function CompetitionWinnersScreen() {
 
       {loading && !competition ? <LoadingBlock /> : null}
 
-      {!competition && !loading ? (
+      {!competition && !loading && error ? (
+        <EmptyState title="Network error" subtitle={error} />
+      ) : null}
+
+      {!competition && !loading && !error ? (
         <EmptyState title={t("common.loading")} subtitle={t("common.later")} />
       ) : null}
 
       {competition && !isClosed ? (
         <AppCard>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
-            {t("competition.closedTitle")}
+            {t("competition.winnersTitle")}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign }]}>
             {t("competition.openMessage")}

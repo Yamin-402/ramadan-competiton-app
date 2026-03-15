@@ -23,7 +23,7 @@ const AI_ASSIST_SETTINGS_KEY = "AI_ASSIST_SETTINGS";
 const DEFAULT_AI_ASSIST_SETTINGS = {
   enabled: Boolean(env.aiApiKey),
   baseUrl: "https://api.groq.com/openai/v1",
-  model: "llama-3.1-8b-instant",
+  model: "llama-3.1-70b-versatile",
   timeoutMs: 25000,
 };
 
@@ -535,6 +535,17 @@ function normalizeQuestionKey(value) {
     .toLowerCase();
 }
 
+function isSuggestionAnswerTooShort(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return true;
+  }
+  if (text.includes(" ")) {
+    return false;
+  }
+  return text.length < 8;
+}
+
 function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion) {
   const suggestion =
     rawSuggestion && typeof rawSuggestion === "object" && !Array.isArray(rawSuggestion)
@@ -545,10 +556,20 @@ function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion
   if (!questionText) {
     return null;
   }
+  if (questionText.length < 12) {
+    return null;
+  }
 
-  const answerExplanation = String(
-    suggestion.answerExplanation || fallbackSuggestion.answerExplanation || ""
+  const fallbackExplanation = String(fallbackSuggestion.answerExplanation || "").trim();
+  let answerExplanation = String(
+    suggestion.answerExplanation || fallbackExplanation || ""
   ).trim();
+  if (answerExplanation.length < 40 && fallbackExplanation.length >= 40) {
+    answerExplanation = fallbackExplanation;
+  }
+  if (answerExplanation.length < 60) {
+    return null;
+  }
   const topic =
     normalizeSuggestionTopic(suggestion.topic) ||
     normalizeSuggestionTopic(fallbackSuggestion.topic) ||
@@ -568,9 +589,15 @@ function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion
   };
 
   if (answerType === "TEXT") {
-    const correctAnswer = String(
+    let correctAnswer = String(
       suggestion.correctAnswer ?? fallbackSuggestion.correctAnswer ?? ""
     ).trim();
+    if (isSuggestionAnswerTooShort(correctAnswer)) {
+      correctAnswer = String(fallbackSuggestion.correctAnswer ?? "").trim();
+    }
+    if (isSuggestionAnswerTooShort(correctAnswer)) {
+      return null;
+    }
     return {
       ...base,
       options: null,
@@ -591,21 +618,37 @@ function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion
 
   const options = normalizeStringArray(suggestion.options);
   const fallbackOptions = normalizeStringArray(fallbackSuggestion.options);
-  const resolvedOptions = options.length >= 2 ? options.slice(0, 6) : fallbackOptions.slice(0, 6);
-  if (resolvedOptions.length < 2) {
+  const rawResolved = options.length >= 2 ? options : fallbackOptions;
+  const resolvedOptions = Array.from(
+    new Set(
+      rawResolved
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .filter((value) => value !== "\u0646\u0639\u0645" && value !== "\u0644\u0627")
+    )
+  );
+  const minOptionCount = answerType === "SINGLE_CHOICE" ? 4 : 3;
+  if (resolvedOptions.length < minOptionCount) {
     return null;
   }
+  const trimmedOptions = resolvedOptions.slice(0, answerType === "SINGLE_CHOICE" ? 4 : 6);
 
   if (answerType === "SINGLE_CHOICE") {
-    const correctAnswer = String(
-      suggestion.correctAnswer ?? fallbackSuggestion.correctAnswer ?? resolvedOptions[0]
+    let correctAnswer = String(
+      suggestion.correctAnswer ?? fallbackSuggestion.correctAnswer ?? trimmedOptions[0]
     ).trim();
-    const resolvedCorrect = resolvedOptions.includes(correctAnswer)
+    if (isSuggestionAnswerTooShort(correctAnswer)) {
+      correctAnswer = String(fallbackSuggestion.correctAnswer ?? "").trim();
+    }
+    const resolvedCorrect = trimmedOptions.includes(correctAnswer)
       ? correctAnswer
-      : resolvedOptions[0];
+      : trimmedOptions[0];
+    if (isSuggestionAnswerTooShort(resolvedCorrect)) {
+      return null;
+    }
     return {
       ...base,
-      options: resolvedOptions,
+      options: trimmedOptions,
       correctAnswer: resolvedCorrect,
     };
   }
@@ -613,12 +656,12 @@ function normalizeSuggestionObject(rawSuggestion, answerType, fallbackSuggestion
   const candidateCorrectArray = normalizeStringArray(suggestion.correctAnswer);
   const fallbackCorrectArray = normalizeStringArray(fallbackSuggestion.correctAnswer);
   const rawCorrectArray = candidateCorrectArray.length > 0 ? candidateCorrectArray : fallbackCorrectArray;
-  const resolvedCorrectArray = rawCorrectArray.filter((value) => resolvedOptions.includes(value));
-  const finalCorrectArray = resolvedCorrectArray.length > 0 ? resolvedCorrectArray : [resolvedOptions[0]];
+  const resolvedCorrectArray = rawCorrectArray.filter((value) => trimmedOptions.includes(value));
+  const finalCorrectArray = resolvedCorrectArray.length > 0 ? resolvedCorrectArray : [trimmedOptions[0]];
 
   return {
     ...base,
-    options: resolvedOptions,
+    options: trimmedOptions,
     correctAnswer: finalCorrectArray,
   };
 }
@@ -1550,7 +1593,7 @@ export const adminService = {
     try {
       rawSuggestions = await fetchIslamicDailyQuestionSuggestions(
         query.answerType,
-        Math.max(query.limit * 3, 12),
+        Math.max(query.limit * 8, 30),
         query.topic,
         query.difficulty
       );
@@ -1568,6 +1611,8 @@ export const adminService = {
         answerType: query.answerType,
         topic: query.topic,
         difficulty: query.difficulty,
+        questionLength: query.questionLength,
+        answerLength: query.answerLength,
         styleProfile,
         suggestion,
       });
@@ -1602,6 +1647,8 @@ export const adminService = {
             answerType: query.answerType,
             topic: query.topic,
             difficulty: query.difficulty,
+            questionLength: query.questionLength,
+            answerLength: query.answerLength,
             styleProfile,
           });
           const normalized = normalizeSuggestionObject(

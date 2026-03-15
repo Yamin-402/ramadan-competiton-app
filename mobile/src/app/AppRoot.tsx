@@ -1,7 +1,7 @@
 ﻿import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GlobalNotificationOverlay } from "../components/GlobalNotificationOverlay";
 import { GlobalAnnouncementPopup } from "../components/GlobalAnnouncementPopup";
@@ -47,6 +47,20 @@ export function AppRoot() {
       clearCompetition();
     }
   }, [authHydrated, token, loadCompetition, clearCompetition]);
+
+  useEffect(() => {
+    if (!authHydrated || !token) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void loadCompetition();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [authHydrated, loadCompetition, token]);
 
 
   if (!settingsHydrated) {

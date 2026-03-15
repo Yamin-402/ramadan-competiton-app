@@ -56,7 +56,6 @@ export const usersRepository = {
         id: true,
         type: true,
         occurredAt: true,
-        competitionDate: true,
         effectivePoints: true,
         isDuringFasting: true,
         isForbidden: true,
@@ -91,14 +90,13 @@ export const usersRepository = {
         userId,
       },
       orderBy: {
-        occurredAt: "asc",
+        occurredAt: "desc",
       },
       take: limit,
       select: {
         id: true,
         type: true,
         occurredAt: true,
-        competitionDate: true,
         effectivePoints: true,
         isDuringFasting: true,
         isForbidden: true,
@@ -124,6 +122,15 @@ export const usersRepository = {
           },
         },
       },
+    });
+  },
+
+  getActivityTotalsByType(userId) {
+    return prisma.activity.groupBy({
+      by: ["type"],
+      where: { userId },
+      _count: { _all: true },
+      _sum: { effectivePoints: true },
     });
   },
 

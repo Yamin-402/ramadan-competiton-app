@@ -18,8 +18,9 @@ function normalizeWinner(raw, index) {
   const rank = Number(raw.rank) || index + 1;
   const displayName = raw.displayName || raw.name || raw.email || `User ${userId}`;
   const avatarUrl = raw.avatarUrl || null;
-  const totalPointsRaw = raw.totalPoints ?? raw.score;
-  const totalPoints = Number.isFinite(Number(totalPointsRaw)) ? Number(totalPointsRaw) : null;
+  const totalPointsCandidate = raw.totalPoints ?? raw.points ?? raw.total;
+  const totalPointsParsed = Number(totalPointsCandidate);
+  const totalPoints = Number.isFinite(totalPointsParsed) ? totalPointsParsed : null;
   return {
     userId,
     rank,

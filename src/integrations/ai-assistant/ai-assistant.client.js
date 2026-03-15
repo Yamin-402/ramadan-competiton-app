@@ -36,12 +36,52 @@ function resolveApiKey() {
   return apiKey;
 }
 
-async function callGroqJson(config, prompt) {
+class GroqHttpError extends Error {
+  constructor(status, bodyText) {
+    super(`AI server returned ${status}${bodyText ? `: ${bodyText}` : ""}`);
+    this.status = status;
+    this.bodyText = bodyText;
+  }
+}
+
+function uniqueStrings(values) {
+  return Array.from(
+    new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
+  );
+}
+
+function buildModelCandidates(model) {
+  return uniqueStrings([
+    model,
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "mixtral-8x7b-32768",
+  ]);
+}
+
+function looksLikeModelError(error) {
+  if (!(error instanceof GroqHttpError)) {
+    return false;
+  }
+  if (error.status !== 400 && error.status !== 404) {
+    return false;
+  }
+  const text = String(error.bodyText || "").toLowerCase();
+  return (
+    text.includes("model") &&
+    (text.includes("not found") || text.includes("invalid") || text.includes("unknown"))
+  );
+}
+
+async function callGroqJsonOnce(config, prompt, modelOverride) {
   const baseUrl = toSafeBaseUrl(config.baseUrl);
   const timeoutMs = Number.isFinite(Number(config.timeoutMs))
     ? Math.max(5000, Math.min(90000, Number(config.timeoutMs)))
     : 25000;
-  const model = String(config.model || "").trim();
+  const model = String(modelOverride || config.model || "").trim();
   if (!model) {
     throw new Error("AI model is missing");
   }
@@ -59,7 +99,7 @@ async function callGroqJson(config, prompt) {
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: 1100,
         messages: [
           {
             role: "system",
@@ -77,7 +117,7 @@ async function callGroqJson(config, prompt) {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      throw new Error(`AI server returned ${response.status}${detail ? `: ${detail}` : ""}`);
+      throw new GroqHttpError(response.status, detail);
     }
 
     const payload = await response.json();
@@ -88,6 +128,26 @@ async function callGroqJson(config, prompt) {
   }
 }
 
+async function callGroqJson(config, prompt) {
+  const model = String(config.model || "").trim();
+  const candidates = buildModelCandidates(model);
+
+  let lastError;
+  for (const candidate of candidates) {
+    try {
+      return await callGroqJsonOnce(config, prompt, candidate);
+    } catch (error) {
+      lastError = error;
+      if (looksLikeModelError(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("AI request failed");
+}
+
 export async function rewriteDailyQuestionSuggestionWithAi(config, context) {
   const prompt = [
     "Rewrite this Islamic question suggestion for a Ramadan competition.",
@@ -96,13 +156,23 @@ export async function rewriteDailyQuestionSuggestionWithAi(config, context) {
     `Requested answerType: ${context.answerType}`,
     `Requested topic: ${context.topic || "ANY"}`,
     `Requested difficulty: ${context.difficulty || "ANY"}`,
+    `Requested questionLength: ${context.questionLength || "ANY"}`,
+    `Requested answerLength: ${context.answerLength || "ANY"}`,
     "Output rules:",
-    "- questionText: short, clear Arabic question.",
-    "- correctAnswer: very concise.",
-    "- answerExplanation: concise Arabic explanation, max 220 chars.",
+    "- questionText: one clear Arabic question sentence (max 200 chars). Avoid long story/context.",
+    "- Follow length buckets for questionText when possible: SHORT ~40-80 chars, MEDIUM ~80-140, LONG ~140-200.",
+    "- answerExplanation: 2 to 3 short sentences, clear and practical (90 to 420 chars).",
+    "- Follow length buckets for answerExplanation when possible: SHORT ~90-150 chars, MEDIUM ~150-240, LONG ~240-420.",
+    "- Avoid extremely short or vague explanations. Do not output 1-word answers.",
+    "- If suggestion has rawAnswer, use it as main source and simplify it.",
+    "- For SINGLE_CHOICE: generate exactly 4 Arabic options (2 to 7 words each), one correct, 3 plausible distractors.",
+    "- For MULTIPLE_CHOICE: generate 4 to 6 options, and 2 to 3 correct answers.",
+    "- correctAnswer MUST match option(s) exactly for choice types.",
+    "- correctAnswer for non-boolean types should be a short phrase (at least 12 chars), not a single word.",
     "- options: required only for choice-based answer types.",
     "- topic must be one of: FIQH,HADITH,QURAN,AQEEDAH,SEERAH,AKHLAQ.",
     "- difficulty must be one of: EASY,MEDIUM,HARD.",
+    "- Avoid controversial/rare opinions. Prefer well-known, practical Islamic knowledge.",
     `Admin style profile: ${JSON.stringify(context.styleProfile)}`,
     `Raw suggestion: ${JSON.stringify(context.suggestion)}`,
     'JSON shape: {"questionText":"...","correctAnswer":"...","answerExplanation":"...","options":[],"topic":"FIQH","difficulty":"EASY"}',
@@ -119,13 +189,22 @@ export async function generateDailyQuestionSuggestionWithAi(config, context) {
     `Requested answerType: ${context.answerType}`,
     `Requested topic: ${context.topic || "ANY"}`,
     `Requested difficulty: ${context.difficulty || "ANY"}`,
+    `Requested questionLength: ${context.questionLength || "ANY"}`,
+    `Requested answerLength: ${context.answerLength || "ANY"}`,
     "Output rules:",
-    "- questionText: short, clear Arabic question (max 200 chars).",
-    "- correctAnswer: very concise.",
-    "- answerExplanation: concise Arabic explanation, max 220 chars.",
-    "- options: required only for choice-based answer types (2 to 5 options).",
+    "- questionText: one clear Arabic question sentence (max 200 chars). Avoid long story/context.",
+    "- Follow length buckets for questionText when possible: SHORT ~40-80 chars, MEDIUM ~80-140, LONG ~140-200.",
+    "- answerExplanation: 2 to 3 short sentences, clear and practical (90 to 420 chars).",
+    "- Follow length buckets for answerExplanation when possible: SHORT ~90-150 chars, MEDIUM ~150-240, LONG ~240-420.",
+    "- Avoid extremely short or vague explanations. Do not output 1-word answers.",
+    "- For SINGLE_CHOICE: generate exactly 4 Arabic options (2 to 7 words each), one correct, 3 plausible distractors.",
+    "- For MULTIPLE_CHOICE: generate 4 to 6 options, and 2 to 3 correct answers.",
+    "- correctAnswer MUST match option(s) exactly for choice types.",
+    "- correctAnswer for non-boolean types should be a short phrase (at least 12 chars), not a single word.",
+    "- options: required only for choice-based answer types.",
     "- topic must be one of: FIQH,HADITH,QURAN,AQEEDAH,SEERAH,AKHLAQ.",
     "- difficulty must be one of: EASY,MEDIUM,HARD.",
+    "- Avoid controversial/rare opinions. Prefer well-known, practical Islamic knowledge.",
     `Admin style profile: ${JSON.stringify(context.styleProfile)}`,
     'JSON shape: {"questionText":"...","correctAnswer":"...","answerExplanation":"...","options":[],"topic":"FIQH","difficulty":"EASY"}',
   ].join("\n");
@@ -165,6 +244,7 @@ export async function generateUserProgressReportWithAi(config, context) {
     "- actionPlan: array of practical next steps.",
     "- motivation: short final motivational paragraph.",
     "- Keep content user-friendly and practical.",
+    "- Always reflect the provided analytics totals (totalActivities, totalPoints). Never claim 0 if analytics shows otherwise.",
     `Input analytics: ${JSON.stringify(context.analytics)}`,
     'JSON shape: {"title":"...","summary":"...","highlights":["..."],"comparison":"...","actionPlan":["..."],"motivation":"..."}',
   ].join("\n");
