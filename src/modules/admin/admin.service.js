@@ -1582,7 +1582,11 @@ export const adminService = {
       const matchesTopic = !query.topic || query.topic === "ANY" || normalized.topic === query.topic;
       const matchesDifficulty =
         !query.difficulty || query.difficulty === "ANY" || normalized.difficulty === query.difficulty;
-      if (!matchesTopic || !matchesDifficulty) {
+      const questionLength = normalized.questionText.length;
+      const answerLength = (normalized.answerExplanation || "").length;
+      const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
+      const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
+      if (!matchesTopic || !matchesDifficulty || !matchesQuestionLength || !matchesAnswerLength) {
         continue;
       }
 
@@ -1605,6 +1609,13 @@ export const adminService = {
             generated || {}
           );
           if (!normalized) {
+            continue;
+          }
+          const questionLength = normalized.questionText.length;
+          const answerLength = (normalized.answerExplanation || "").length;
+          const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
+          const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
+          if (!matchesQuestionLength || !matchesAnswerLength) {
             continue;
           }
           const uniqueKey = `${normalized.answerType}|${normalizeQuestionKey(normalized.questionText)}`;
@@ -1634,6 +1645,13 @@ export const adminService = {
           suggestion
         );
         if (normalized) {
+          const questionLength = normalized.questionText.length;
+          const answerLength = (normalized.answerExplanation || "").length;
+          const matchesQuestionLength = matchesLengthBucket(questionLength, query.questionLength, QUESTION_LENGTH_SHORT_MAX, QUESTION_LENGTH_MEDIUM_MAX);
+          const matchesAnswerLength = matchesLengthBucket(answerLength, query.answerLength, ANSWER_LENGTH_SHORT_MAX, ANSWER_LENGTH_MEDIUM_MAX);
+          if (!matchesQuestionLength || !matchesAnswerLength) {
+            continue;
+          }
           finalized.push(normalized);
         }
       }
@@ -2047,4 +2065,22 @@ export const adminService = {
 
 
 
+
+const QUESTION_LENGTH_SHORT_MAX = 80;
+const QUESTION_LENGTH_MEDIUM_MAX = 140;
+const ANSWER_LENGTH_SHORT_MAX = 100;
+const ANSWER_LENGTH_MEDIUM_MAX = 220;
+
+function matchesLengthBucket(value, bucket, shortMax, mediumMax) {
+  if (!bucket || bucket === "ANY") {
+    return true;
+  }
+  if (bucket === "SHORT") {
+    return value <= shortMax;
+  }
+  if (bucket === "MEDIUM") {
+    return value > shortMax && value <= mediumMax;
+  }
+  return value > mediumMax;
+}
 

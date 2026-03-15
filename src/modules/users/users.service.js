@@ -522,6 +522,14 @@ export const usersService = {
       activities = activitiesResult || [];
       streaks = streaksResult || [];
       aiSettings = aiSettingsResult || DEFAULT_AI_ASSIST_SETTINGS;
+      if (activities.length === 0) {
+        try {
+          const fallbackFromDate = profile.createdAt ? new Date(profile.createdAt) : new Date(0);
+          activities = await usersRepository.listActivitiesForReport(userId, fallbackFromDate);
+        } catch {
+          activities = [];
+        }
+      }
     } catch {
       // fallback to empty analytics if data fetch fails
       activities = [];

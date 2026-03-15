@@ -24,6 +24,22 @@ const suggestionTopics: DailyQuestionTopic[] = [
 ];
 const suggestionDifficulties: DailyQuestionDifficulty[] = ["ANY", "EASY", "MEDIUM", "HARD"];
 
+type LengthFilter = "ANY" | "SHORT" | "MEDIUM" | "LONG";
+const suggestionLengths: LengthFilter[] = ["ANY", "SHORT", "MEDIUM", "LONG"];
+
+function lengthLabel(value: LengthFilter): string {
+  switch (value) {
+    case "SHORT":
+      return "Short";
+    case "MEDIUM":
+      return "Medium";
+    case "LONG":
+      return "Long";
+    default:
+      return "Any";
+  }
+}
+
 function toDateKey(value: string): string {
   return new Date(value).toISOString().slice(0, 10);
 }
@@ -149,6 +165,8 @@ export function DailyQuestionsModule() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionTopic, setSuggestionTopic] = useState<DailyQuestionTopic>("ANY");
   const [suggestionDifficulty, setSuggestionDifficulty] = useState<DailyQuestionDifficulty>("ANY");
+  const [suggestionQuestionLength, setSuggestionQuestionLength] = useState<LengthFilter>("ANY");
+  const [suggestionAnswerLength, setSuggestionAnswerLength] = useState<LengthFilter>("ANY");
   const [aiSettings, setAiSettings] = useState<AiAssistSettings>({
     enabled: false,
     baseUrl: "https://api.groq.com/openai/v1",
@@ -397,7 +415,26 @@ export function DailyQuestionsModule() {
     }
   };
 
-  const loadSuggestions = async () => {
+  const buildSuggestionKey = (suggestion: DailyQuestionSuggestion) =>
+    `${suggestion.answerType}|${String(suggestion.questionText || "").trim().toLowerCase()}`;
+
+  const mergeSuggestions = (
+    current: DailyQuestionSuggestion[],
+    incoming: DailyQuestionSuggestion[]
+  ) => {
+    const seen = new Set(current.map(buildSuggestionKey));
+    const merged = [...current];
+    for (const item of incoming) {
+      const key = buildSuggestionKey(item);
+      if (!seen.has(key)) {
+        merged.push(item);
+        seen.add(key);
+      }
+    }
+    return merged;
+  };
+
+  const loadSuggestions = async (append = false) => {
     setError(null);
     setSuccess(null);
     setLoadingSuggestions(true);
@@ -406,12 +443,15 @@ export function DailyQuestionsModule() {
         answerType,
         topic: suggestionTopic,
         difficulty: suggestionDifficulty,
+        questionLength: suggestionQuestionLength,
+        answerLength: suggestionAnswerLength,
         limit: 6,
       });
-      setSuggestions(data);
+      const next = append ? mergeSuggestions(suggestions, data) : data;
+      setSuggestions(next);
       setShowSuggestions(true);
       if (data.length === 0) {
-        setSuccess("No suggestions found for the selected filters.");
+        setSuccess(append ? "No more suggestions found." : "No suggestions found for the selected filters.");
       } else {
         setSuccess(`Loaded ${data.length} suggestion(s).`);
       }
@@ -700,8 +740,37 @@ export function DailyQuestionsModule() {
                   ))}
                 </select>
               </label>
+              <label>
+                Question length
+                <select
+                  value={suggestionQuestionLength}
+                  onChange={(event) => setSuggestionQuestionLength(event.target.value as LengthFilter)}
+                >
+                  {suggestionLengths.map((value) => (
+                    <option key={value} value={value}>
+                      {lengthLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Answer length
+                <select
+                  value={suggestionAnswerLength}
+                  onChange={(event) => setSuggestionAnswerLength(event.target.value as LengthFilter)}
+                >
+                  {suggestionLengths.map((value) => (
+                    <option key={value} value={value}>
+                      {lengthLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button type="button" onClick={() => void loadSuggestions()} disabled={loadingSuggestions}>
                 {loadingSuggestions ? "Loading..." : "Suggest"}
+              </button>
+              <button type="button" onClick={() => void loadSuggestions(true)} disabled={loadingSuggestions}>
+                {loadingSuggestions ? "Loading..." : "Load more"}
               </button>
               <button
                 type="button"

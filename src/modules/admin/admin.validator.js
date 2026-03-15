@@ -9,6 +9,7 @@ const notificationTargetTypeSchema = z.enum(["ALL_USERS", "TAGS", "USER_IDS"]);
 const dailyQuestionTypeSchema = z.enum(["TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "BOOLEAN"]);
 const dailyQuestionTopicSchema = z.enum(["ANY", "FIQH", "HADITH", "QURAN", "AQEEDAH", "SEERAH", "AKHLAQ"]);
 const dailyQuestionDifficultySchema = z.enum(["ANY", "EASY", "MEDIUM", "HARD"]);
+const dailyQuestionLengthSchema = z.enum(["ANY", "SHORT", "MEDIUM", "LONG"]);
 const adminRoleSchema = z.enum(["ADMIN", "SUPER_ADMIN"]);
 
 const adminPermissionsSchema = z.array(z.string().min(1)).max(50);
@@ -198,6 +199,8 @@ export const listDailyQuestionSuggestionsQuerySchema = z.object({
   topic: dailyQuestionTopicSchema.default("ANY"),
   difficulty: dailyQuestionDifficultySchema.default("ANY"),
   limit: z.coerce.number().int().min(1).max(10).default(5),
+  questionLength: dailyQuestionLengthSchema.default("ANY"),
+  answerLength: dailyQuestionLengthSchema.default("ANY"),
 });
 
 export const generateMotivationNotificationsSchema = z.object({

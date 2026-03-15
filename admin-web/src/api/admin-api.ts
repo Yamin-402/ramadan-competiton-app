@@ -240,6 +240,8 @@ export const adminApi = {
     answerType: "TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "BOOLEAN";
     topic?: DailyQuestionTopic;
     difficulty?: DailyQuestionDifficulty;
+    questionLength?: "ANY" | "SHORT" | "MEDIUM" | "LONG";
+    answerLength?: "ANY" | "SHORT" | "MEDIUM" | "LONG";
     limit?: number;
   }) {
     return requestData<DailyQuestionSuggestion[]>({
