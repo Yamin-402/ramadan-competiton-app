@@ -1,7 +1,8 @@
-import { AppError } from "../../core/errors/app-error.js";
+﻿import { AppError } from "../../core/errors/app-error.js";
 import { env } from "../../core/config/env.js";
 import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
+import { competitionService } from "../competition/competition.service.js";
 import { getOrCreateFastingWindow } from "../../integrations/prayer-times/prayer-time.service.js";
 import { dailyQuestionsRepository } from "./daily-questions.repository.js";
 
@@ -104,7 +105,22 @@ async function revealDueAnswersByFajr(now = new Date()) {
   );
 }
 
+async function revealAllAnswers() {
+  const revealedAt = new Date();
+  const farFuture = new Date("9999-12-31T00:00:00Z");
+  await dailyQuestionsRepository.revealAnswersBeforeDate(
+    farFuture,
+    revealedAt,
+    env.appTimezone
+  );
+}
+
+
 export const dailyQuestionsService = {
+  async revealAllAnswers() {
+    await revealAllAnswers();
+  },
+
   async getTodayQuestion() {
     await revealDueAnswersByFajr(new Date());
     const dateOnly = await resolveCompetitionDateByFajr(new Date());
@@ -115,6 +131,7 @@ export const dailyQuestionsService = {
 
   async submitAnswer(auth, questionId, payload) {
     const userId = getAuthUserId(auth);
+    await competitionService.assertCompetitionOpenForUser(userId);
     const question = await dailyQuestionsRepository.findById(questionId);
 
     if (!question || !question.isActive) {

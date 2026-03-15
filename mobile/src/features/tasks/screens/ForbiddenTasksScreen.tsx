@@ -12,6 +12,7 @@ import { TaskItemCard } from "../../../components/TaskItemCard";
 import { TopToast } from "../../../components/TopToast";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
+import { useCompetitionStore } from "../../../store/competition-store";
 import { Task } from "../../../types/domain";
 import { getDailyCompletionLimit, getTaskCategory, getTaskInteractionKind } from "../task-presentation";
 import {
@@ -43,6 +44,8 @@ function getSignedPointsLabel(value: number | string) {
 export function ForbiddenTasksScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
+  const competition = useCompetitionStore((state) => state.state);
+  const isCompetitionClosed = competition ? !competition.isOpen && !competition.canAct : false;
   const textAlign = isArabic ? "right" : "left";
   const [defaultFastingSelection, setDefaultFastingSelection] = useState<FastingSelection>(
     getDefaultFastingSelection()
@@ -115,6 +118,10 @@ export function ForbiddenTasksScreen() {
   const handleLogForbidden = async (task: Task) => {
     setError(null);
     setSuccessMessage(null);
+    if (isCompetitionClosed) {
+      setError(t("competition.closedMessage"));
+      return;
+    }
     const dailyLimit = getDailyCompletionLimit(task);
     const currentCount = todayCompletionCountByTaskId[task.id] || 0;
     if (dailyLimit !== null && currentCount >= dailyLimit) {
@@ -182,6 +189,17 @@ export function ForbiddenTasksScreen() {
         </Text>
       </View>
 
+      {isCompetitionClosed ? (
+        <View style={[styles.closedBox, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <Text style={[styles.warningTitle, { color: colors.textPrimary, textAlign }]}>
+            {t("competition.closedTitle")}
+          </Text>
+          <Text style={[styles.warningText, { color: colors.textSecondary, textAlign }]}>
+            {t("competition.closedMessage")}
+          </Text>
+        </View>
+      ) : null}
+
       <AppButton label={t("common.refresh")} variant="ghost" onPress={() => void loadData()} />
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
@@ -218,6 +236,7 @@ export function ForbiddenTasksScreen() {
             onFastingSelectionChange={(value) =>
               setFastingSelectionByTaskId((prev) => ({ ...prev, [task.id]: value }))
             }
+            actionsDisabled={isCompetitionClosed}
           />
             );
           })()
@@ -241,6 +260,12 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  closedBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
   },
   error: {
     fontSize: 13,

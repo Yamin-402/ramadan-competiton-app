@@ -1,4 +1,4 @@
-export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
+﻿export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
 export type TaskType = "NORMAL" | "COUNTER" | "FORBIDDEN" | "CONDITIONAL" | "STREAK";
 export type TaskStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 export type CounterValueSource = "FIXED" | "ACTIVITY_INPUT";
@@ -305,3 +305,22 @@ export interface AiUserReport {
     forbiddenCount: number;
   };
 }
+
+export interface CompetitionWinner {
+  userId: number;
+  rank: number;
+  displayName: string;
+  avatarUrl?: string | null;
+  totalPoints: number;
+}
+
+export interface CompetitionState {
+  isOpen: boolean;
+  closedAt?: string | null;
+  winners: CompetitionWinner[];
+  allowedUserIds?: number[];
+  showWinnersPopup: boolean;
+  updatedAt?: string | null;
+  canAct?: boolean;
+}
+

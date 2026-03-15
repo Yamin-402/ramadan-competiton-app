@@ -1,4 +1,4 @@
-export const ADMIN_PERMISSION_KEYS = [
+﻿export const ADMIN_PERMISSION_KEYS = [
   "DASHBOARD",
   "TASKS",
   "COUNTERS",
@@ -8,6 +8,7 @@ export const ADMIN_PERMISSION_KEYS = [
   "DAILY_QUESTIONS",
   "LEADERBOARD",
   "USER_TASK_HISTORY",
+  "COMPETITION",
   "USER_MANAGEMENT",
 ];
 

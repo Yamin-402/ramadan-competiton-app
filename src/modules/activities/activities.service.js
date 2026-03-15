@@ -4,6 +4,7 @@ import { getAuthUserId } from "../../core/utils/get-auth-user-id.js";
 import { toAppDateString, toDateOnly } from "../../core/utils/timezone.js";
 import {
   getOrCreateFastingWindow,
+import { competitionService } from "../competition/competition.service.js";
   isDuringFastingTime,
 } from "../../integrations/prayer-times/prayer-time.service.js";
 import { activitiesRepository } from "./activities.repository.js";
@@ -1010,6 +1011,7 @@ export const activitiesService = {
   async createTaskCompletion(auth, payload) {
     const userId = getAuthUserId(auth);
     const occurredAt = payload.occurredAt ? new Date(payload.occurredAt) : new Date();
+    await competitionService.assertCompetitionOpenForUser(userId);
 
     if (Number.isNaN(occurredAt.getTime())) {
       throw new AppError(400, "Invalid occurredAt datetime");

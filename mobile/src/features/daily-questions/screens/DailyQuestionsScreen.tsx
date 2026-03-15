@@ -13,6 +13,7 @@ import { ScreenContainer } from "../../../components/ScreenContainer";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
+import { useCompetitionStore } from "../../../store/competition-store";
 import { TranslationKey, translate } from "../../../i18n/strings";
 import { DailyQuestion, DailyQuestionHistoryItem } from "../../../types/domain";
 import { escapeHtml, exportPdfFromHtml, loadArabicFontBase64 } from "../../../utils/pdf-export";
@@ -168,6 +169,8 @@ export function DailyQuestionsScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
+  const competition = useCompetitionStore((state) => state.state);
+  const isCompetitionClosed = competition ? !competition.isOpen && !competition.canAct : false;
   const textAlign = isArabic ? "right" : "left";
   const isRamadanVariant =
     tasksDesignVariant === "ramadan_modern" || tasksDesignVariant === "ramadan_nights";
@@ -313,6 +316,10 @@ export function DailyQuestionsScreen() {
 
   const submitTodayAnswer = async () => {
     if (!todayQuestion || todayAnswer) {
+      return;
+    }
+    if (isCompetitionClosed) {
+      setError(t("competition.closedMessage"));
       return;
     }
 
@@ -576,6 +583,27 @@ export function DailyQuestionsScreen() {
         </Text>
       ) : null}
 
+      {isCompetitionClosed ? (
+        <AppCard
+          style={
+            isModernVariant
+              ? { borderColor: "#d7dfec", backgroundColor: "#f8fbff" }
+              : isNightVariant
+                ? { borderColor: "#5d4a8f", backgroundColor: "#1c1542" }
+                : isRamadanVariant
+                  ? { borderColor: "#ceb983", backgroundColor: "#fff8e7" }
+                  : undefined
+          }
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign }]}>
+            {t("competition.closedTitle")}
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign }]}>
+            {t("competition.closedMessage")}
+          </Text>
+        </AppCard>
+      ) : null}
+
       {loading ? <LoadingBlock /> : null}
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
@@ -666,7 +694,7 @@ export function DailyQuestionsScreen() {
                     <AppButton
                       label={submitting ? t("daily.submitting") : t("daily.submit")}
                       onPress={() => void submitTodayAnswer()}
-                      disabled={submitting}
+                      disabled={submitting || isCompetitionClosed}
                     />
                   </>
                 )}
@@ -761,7 +789,7 @@ export function DailyQuestionsScreen() {
                               },
                             ]}
                           >
-                            {getHistoryStatusLabel(item, tExport)}
+                            {getHistoryStatusLabel(item, t)}
                           </Text>
 
                           <View style={[styles.answerBlock, { borderColor: colors.border }]}>
@@ -770,7 +798,7 @@ export function DailyQuestionsScreen() {
                             </Text>
                             <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
                               {item.didAnswer
-                                ? formatAnswerForDisplay(item.answer, tExport)
+                                ? formatAnswerForDisplay(item.answer, t)
                                 : t("daily.notAnswered")}
                             </Text>
                           </View>
@@ -781,7 +809,7 @@ export function DailyQuestionsScreen() {
                             </Text>
                             <Text style={[styles.metaText, { color: colors.textSecondary, textAlign }]}>
                               {item.status === "revealed"
-                                ? formatAnswerForDisplay(item.questionCorrectAnswer, tExport)
+                                ? formatAnswerForDisplay(item.questionCorrectAnswer, t)
                                 : t("daily.revealLater")}
                             </Text>
                             {item.status === "revealed" &&

@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 const taskTypeSchema = z.enum(["NORMAL", "COUNTER", "FORBIDDEN", "CONDITIONAL", "STREAK"]);
 const taskStatusSchema = z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]);
@@ -203,6 +203,26 @@ export const listDailyQuestionSuggestionsQuerySchema = z.object({
   answerLength: dailyQuestionLengthSchema.default("ANY"),
 });
 
+
+const competitionWinnerSchema = z.object({
+  userId: z.coerce.number().int().positive(),
+  rank: z.coerce.number().int().min(1).max(3).optional(),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().nullable().optional(),
+  totalPoints: z.coerce.number().optional(),
+});
+
+export const updateCompetitionStateSchema = z.object({
+  isOpen: z.boolean().optional(),
+  allowedUserIds: z.array(z.coerce.number().int().positive()).optional(),
+  showWinnersPopup: z.boolean().optional(),
+  winners: z.array(competitionWinnerSchema).max(3).optional(),
+});
+
+export const closeCompetitionSchema = z.object({
+  showWinnersPopup: z.boolean().optional(),
+  winners: z.array(competitionWinnerSchema).max(3).optional(),
+});
 export const generateMotivationNotificationsSchema = z.object({
   lookbackDays: z.coerce.number().int().min(3).max(90).default(14),
   limitUsers: z.coerce.number().int().min(1).max(500).default(80),

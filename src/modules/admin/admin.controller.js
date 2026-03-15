@@ -1,4 +1,4 @@
-import {
+﻿import {
   adminLeaderboardQuerySchema,
   createAdminAccountSchema,
   createCounterSchema,
@@ -27,6 +27,8 @@ import {
   updateAiAssistSettingsSchema,
   updateAdminAccessSchema,
   updateScoringSettingsSchema,
+  updateCompetitionStateSchema,
+  closeCompetitionSchema,
   updateDailyQuestionSchema,
   userParamsSchema,
   updateTaskSchema,
@@ -254,6 +256,33 @@ export async function updateAdminAccess(req, res) {
   res.status(200).json({ data });
 }
 
+
+export async function getCompetitionState(req, res) {
+  const data = await adminService.getCompetitionState(req.auth);
+
+  res.status(200).json({ data });
+}
+
+export async function updateCompetitionState(req, res) {
+  const payload = updateCompetitionStateSchema.parse(req.body || {});
+  const data = await adminService.updateCompetitionState(req.auth, payload);
+
+  res.status(200).json({ data });
+}
+
+export async function openCompetition(req, res) {
+  const data = await adminService.openCompetition(req.auth);
+
+  res.status(200).json({ data });
+}
+
+export async function closeCompetition(req, res) {
+  const payload = closeCompetitionSchema.parse(req.body || {});
+  const data = await adminService.closeCompetition(req.auth, payload);
+
+  res.status(200).json({ data });
+}
+
 export async function getScoringSettings(req, res) {
   const data = await adminService.getScoringSettings(req.auth);
 
@@ -279,3 +308,4 @@ export async function updateAiAssistSettings(req, res) {
 
   res.status(200).json({ data });
 }
+

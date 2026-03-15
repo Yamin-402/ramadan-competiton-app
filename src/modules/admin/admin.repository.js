@@ -1125,4 +1125,22 @@ export const adminRepository = {
       })
       .slice(0, limit);
   },
+
+  async getTotalPointsByUserIds(userIds) {
+    if (!userIds || userIds.length === 0) {
+      return new Map();
+    }
+
+    const grouped = await prisma.activity.groupBy({
+      by: ["userId"],
+      where: {
+        userId: { in: userIds },
+      },
+      _sum: {
+        effectivePoints: true,
+      },
+    });
+
+    return new Map(grouped.map((row) => [row.userId, Number(row._sum.effectivePoints || 0)]));
+  },
 };

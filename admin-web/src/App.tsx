@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminApi } from "./api/admin-api";
 import { setHttpSession, toApiErrorMessage } from "./api/http";
 import { publicApi } from "./api/public-api";
@@ -13,6 +13,7 @@ import { AdjustmentsModule } from "./modules/AdjustmentsModule";
 import { NotificationsModule } from "./modules/NotificationsModule";
 import { DailyQuestionsModule } from "./modules/DailyQuestionsModule";
 import { LeaderboardModule } from "./modules/LeaderboardModule";
+import { CompetitionModule } from "./modules/CompetitionModule";
 import { UserTaskHistoryModule } from "./modules/UserTaskHistoryModule";
 import { AdminAccessModule } from "./modules/AdminAccessModule";
 
@@ -25,6 +26,7 @@ type ModuleKey =
   | "notifications"
   | "dailyQuestions"
   | "leaderboard"
+  | "competition"
   | "userTaskHistory"
   | "adminAccess";
 
@@ -37,6 +39,7 @@ const baseModuleItems: Array<{ key: ModuleKey; label: string }> = [
   { key: "notifications", label: "Notifications" },
   { key: "dailyQuestions", label: "Daily Questions" },
   { key: "leaderboard", label: "Leaderboard" },
+  { key: "competition", label: "Competition" },
   { key: "userTaskHistory", label: "User Task History" },
 ];
 
@@ -188,6 +191,10 @@ export default function App() {
           />
         ) : null}
 
+        {activeModule === "competition" ? (
+          <CompetitionModule users={users} />
+        ) : null}
+
         {activeModule === "userTaskHistory" ? (
           <UserTaskHistoryModule users={users} initialUserId={historyTargetUserId} />
         ) : null}
@@ -199,3 +206,5 @@ export default function App() {
     </div>
   );
 }
+
+

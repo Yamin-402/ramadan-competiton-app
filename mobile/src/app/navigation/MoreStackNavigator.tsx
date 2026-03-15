@@ -11,6 +11,7 @@ import { ProfileScreen } from "../../features/profile/screens/ProfileScreen";
 import { AiReportScreen } from "../../features/reports/screens/AiReportScreen";
 import { UserProfileScreen } from "../../features/profile/screens/UserProfileScreen";
 import { StreaksScreen } from "../../features/streaks/screens/StreaksScreen";
+import { CompetitionWinnersScreen } from "../../features/competition/screens/CompetitionWinnersScreen";
 import { MoreHeaderStatus } from "../../components/MoreHeaderStatus";
 import { useAppTheme } from "../../hooks/use-app-theme";
 import { useI18n } from "../../hooks/use-i18n";
@@ -66,6 +67,11 @@ export function MoreStackNavigator() {
       <Stack.Screen name="Money" component={MoneyScreen} options={{ title: t("more.money") }} />
       <Stack.Screen name="ActivityStats" component={ActivityStatsScreen} options={{ title: t("more.stats") }} />
       <Stack.Screen name="AiReport" component={AiReportScreen} options={{ title: t("more.aiReport") }} />
+      <Stack.Screen
+        name="CompetitionWinners"
+        component={CompetitionWinnersScreen}
+        options={{ title: t("more.winners") }}
+      />
       <Stack.Screen
         name="ActivityHistory"
         component={ActivityHistoryScreen}

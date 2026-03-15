@@ -1,4 +1,4 @@
-import {
+﻿import {
   AiAssistSettings,
   AdminAccessUser,
   AdminCounter,
@@ -16,6 +16,8 @@ import {
   NotificationCampaignListItem,
   ScoringSettings,
   TaskCreatePayload,
+  CompetitionState,
+  CompetitionWinner,
 } from "../types";
 import { requestData } from "./http";
 
@@ -331,6 +333,35 @@ export const adminApi = {
     });
   },
 
+  getCompetitionState() {
+    return requestData<CompetitionState>({
+      method: "GET",
+      url: "/admin/competition",
+    });
+  },
+
+  updateCompetitionState(payload: Partial<CompetitionState>) {
+    return requestData<CompetitionState>({
+      method: "PATCH",
+      url: "/admin/competition",
+      data: payload,
+    });
+  },
+
+  openCompetition() {
+    return requestData<CompetitionState>({
+      method: "POST",
+      url: "/admin/competition/open",
+    });
+  },
+
+  closeCompetition(payload?: { winners?: CompetitionWinner[]; showWinnersPopup?: boolean }) {
+    return requestData<CompetitionState>({
+      method: "POST",
+      url: "/admin/competition/close",
+      data: payload || {},
+    });
+  },
   listAdminPermissions() {
     return requestData<string[]>({
       method: "GET",
@@ -396,3 +427,5 @@ export const adminApi = {
     });
   },
 };
+
+

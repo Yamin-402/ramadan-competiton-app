@@ -29,6 +29,14 @@ const en = {
   "common.loadMore": "Load more",
   "common.unread": "Unread",
   "common.read": "Read",
+  "common.close": "Close",
+
+  "competition.winnersTitle": "Competition Winners",
+  "competition.winnersSubtitle": "May Allah accept from you all.",
+  "competition.points": "{points} pts",
+  "competition.closedTitle": "Competition closed",
+  "competition.closedMessage": "The competition is closed now. You can browse, but actions are disabled.",
+  "competition.openMessage": "The competition is still open. Winners will appear after it closes.",
   "announcement.title": "New announcement",
   "announcement.dismiss": "Got it",
 
@@ -44,6 +52,7 @@ const en = {
   "more.profile": "Profile",
   "more.guide": "App Guide",
   "more.aiReport": "AI Report",
+  "more.winners": "Winners",
 
   "tasks.title": "Today's Tasks",
   "tasks.subtitle": "Complete normal tasks with category filters and clear task-type actions.",
@@ -408,6 +417,14 @@ const ar: Record<keyof typeof en, string> = {
   "common.loadMore": "عرض المزيد",
   "common.unread": "غير مقروء",
   "common.read": "مقروء",
+  "common.close": "إغلاق",
+
+  "competition.winnersTitle": "الفائزون في المسابقة",
+  "competition.winnersSubtitle": "تقبّل الله منكم جميعًا.",
+  "competition.points": "{points} نقطة",
+  "competition.closedTitle": "تم إغلاق المسابقة",
+  "competition.closedMessage": "المسابقة مغلقة الآن. يمكنك التصفح فقط بدون تنفيذ مهام.",
+  "competition.openMessage": "المسابقة ما زالت مفتوحة. سيتم إعلان الفائزين بعد الإغلاق.",
   "announcement.title": "إعلان جديد",
   "announcement.dismiss": "تمام",
 
@@ -423,6 +440,7 @@ const ar: Record<keyof typeof en, string> = {
   "more.profile": "الملف الشخصي",
   "more.guide": "دليل التطبيق",
   "more.aiReport": "تقرير ذكي",
+  "more.winners": "الفائزون",
 
   "tasks.title": "مهام اليوم",
   "tasks.subtitle": "أكمل مهامك اليومية بشكل واضح ومبسط.",
@@ -767,3 +785,5 @@ export type TranslationKey = keyof typeof en;
 export function translate(language: AppLanguage, key: TranslationKey): string {
   return dictionary[language][key] || en[key];
 }
+
+

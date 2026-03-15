@@ -48,9 +48,6 @@ export const usersRepository = {
         occurredAt: {
           gte: fromDate,
         },
-        type: {
-          in: ["TASK_COMPLETION", "DAILY_QUESTION_ANSWER", "MANUAL_ADJUSTMENT"],
-        },
       },
       orderBy: {
         occurredAt: "asc",

@@ -12,6 +12,7 @@ import {
 import { normalizeAdminPermissions } from "../../core/auth/admin-permissions.js";
 import bcrypt from "bcrypt";
 import { adminRepository } from "./admin.repository.js";
+import { competitionService } from "../competition/competition.service.js";
 
 const SCORING_MULTIPLIER_SETTING_KEY = "SCORING_MULTIPLIER";
 const DEFAULT_SCORING_MULTIPLIER_CONFIG = {
@@ -2034,6 +2035,52 @@ export const adminService = {
     }));
   },
 
+
+  async getCompetitionState(_auth) {
+    return competitionService.getState();
+  },
+
+  async updateCompetitionState(auth, payload) {
+    const adminId = getAuthUserId(auth);
+    const data = await competitionService.updateState(payload);
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "UPDATE_COMPETITION_STATE",
+      entityType: "APP_SETTING",
+      entityId: "competition_state",
+      summary: "Updated competition state",
+      payload,
+    });
+    return data;
+  },
+
+  async openCompetition(auth) {
+    const adminId = getAuthUserId(auth);
+    const data = await competitionService.openCompetition();
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "OPEN_COMPETITION",
+      entityType: "APP_SETTING",
+      entityId: "competition_state",
+      summary: "Opened competition",
+      payload: {},
+    });
+    return data;
+  },
+
+  async closeCompetition(auth, payload) {
+    const adminId = getAuthUserId(auth);
+    const data = await competitionService.closeCompetition(payload);
+    await adminRepository.createAdminActionLog({
+      adminId,
+      action: "CLOSE_COMPETITION",
+      entityType: "APP_SETTING",
+      entityId: "competition_state",
+      summary: "Closed competition",
+      payload,
+    });
+    return data;
+  },
   async listNotificationCampaigns(_auth, query) {
     return adminRepository.listNotificationCampaigns(query.limit);
   },

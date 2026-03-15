@@ -36,6 +36,7 @@ export type MoreStackParamList = {
   ActivityStats: undefined;
   ActivityHistory: undefined;
   AiReport: undefined;
+  CompetitionWinners: undefined;
   Profile: undefined;
   UserProfile: {
     userId: number;

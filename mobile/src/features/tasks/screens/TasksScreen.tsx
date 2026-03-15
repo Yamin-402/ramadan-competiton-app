@@ -16,6 +16,7 @@ import { TopToast } from "../../../components/TopToast";
 import { useAppTheme } from "../../../hooks/use-app-theme";
 import { useI18n } from "../../../hooks/use-i18n";
 import { useSettingsStore } from "../../../store/settings-store";
+import { useCompetitionStore } from "../../../store/competition-store";
 import { Task } from "../../../types/domain";
 import { formatPoints } from "../../../utils/format";
 import { pointsEvents } from "../../../events/points-events";
@@ -169,6 +170,8 @@ export function TasksScreen() {
   const { colors } = useAppTheme();
   const { t, isArabic } = useI18n();
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
+  const competition = useCompetitionStore((state) => state.state);
+  const isCompetitionClosed = competition ? !competition.isOpen && !competition.canAct : false;
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [streakByTaskId, setStreakByTaskId] = useState<Record<number, number>>({});
@@ -287,6 +290,10 @@ export function TasksScreen() {
   const handleLogTask = async (task: Task) => {
     setError(null);
     setSuccessMessage(null);
+    if (isCompetitionClosed) {
+      setError(t("competition.closedMessage"));
+      return;
+    }
     const dailyLimit = getDailyCompletionLimit(task);
     const currentCount = todayCompletionCountByTaskId[task.id] || 0;
     if (dailyLimit !== null && currentCount >= dailyLimit) {
@@ -408,6 +415,7 @@ export function TasksScreen() {
           successMessage={successMessage}
           onRefresh={handleRefresh}
           t={t}
+          isCompetitionClosed={isCompetitionClosed}
         />
       ) : null}
 
@@ -446,6 +454,7 @@ export function TasksScreen() {
           onRefresh={handleRefresh}
           t={t}
           nightMode={tasksDesignVariant === "ramadan_nights"}
+          isCompetitionClosed={isCompetitionClosed}
         />
       ) : null}
 
@@ -483,6 +492,7 @@ export function TasksScreen() {
           successMessage={successMessage}
           onRefresh={handleRefresh}
           t={t}
+          isCompetitionClosed={isCompetitionClosed}
         />
       ) : null}
     </ScreenContainer>
@@ -517,6 +527,7 @@ interface TasksViewProps {
   onRefresh: () => Promise<void>;
   t: ReturnType<typeof useI18n>["t"];
   nightMode?: boolean;
+  isCompetitionClosed: boolean;
 }
 
 function getCategoryLabel(category: string, t: ReturnType<typeof useI18n>["t"]) {
@@ -610,6 +621,7 @@ function ClassicTasksView({
   successMessage,
   onRefresh,
   t,
+  isCompetitionClosed,
 }: TasksViewProps) {
   return (
     <>
@@ -617,6 +629,13 @@ function ClassicTasksView({
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
         {t("tasks.subtitle")}
       </Text>
+
+      {isCompetitionClosed ? (
+        <AppCard>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t("competition.closedTitle")}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t("competition.closedMessage")}</Text>
+        </AppCard>
+      ) : null}
 
       <AppCard>
         <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>{t("tasks.summaryTitle")}</Text>
@@ -672,6 +691,7 @@ function ClassicTasksView({
               inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
               selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
               onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
+              actionsDisabled={isCompetitionClosed}
             />
           ))}
         </View>
@@ -705,6 +725,7 @@ function RamadanModernTasksView({
   onRefresh,
   t,
   nightMode = false,
+  isCompetitionClosed,
 }: TasksViewProps) {
   return (
     <>
@@ -754,6 +775,19 @@ function RamadanModernTasksView({
         </View>
       </LinearGradient>
 
+      {isCompetitionClosed ? (
+        <AppCard
+          style={
+            nightMode
+              ? { borderColor: "#5d4a8f", backgroundColor: "#1c1542" }
+              : { borderColor: "#ceb983", backgroundColor: "#fff8e7" }
+          }
+        >
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t("competition.closedTitle")}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t("competition.closedMessage")}</Text>
+        </AppCard>
+      ) : null}
+
       <CategoryRail
         categories={categories}
         selectedCategory={selectedCategory}
@@ -798,6 +832,7 @@ function RamadanModernTasksView({
               inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
               selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
               onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
+              actionsDisabled={isCompetitionClosed}
               t={t}
               nightMode={nightMode}
             />
@@ -832,6 +867,7 @@ function ModernTasksView({
   successMessage,
   onRefresh,
   t,
+  isCompetitionClosed,
 }: TasksViewProps) {
   return (
     <>
@@ -850,6 +886,13 @@ function ModernTasksView({
           <Text style={styles.modernMetricLabel}>{t("tasks.bestStreak")}</Text>
         </AppCard>
       </View>
+
+      {isCompetitionClosed ? (
+        <AppCard style={{ borderColor: "#d7dfec", backgroundColor: "#f8fbff" }}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t("competition.closedTitle")}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t("competition.closedMessage")}</Text>
+        </AppCard>
+      ) : null}
 
       <CategoryRail
         categories={categories}
@@ -894,6 +937,7 @@ function ModernTasksView({
               inlineTasks={getConditionalInlineTasks(task, isArabic ? "ar" : "en")}
               selectedInlineTaskKeys={selectedInlineTaskKeysByTaskId[task.id] || []}
               onToggleInlineTaskKey={(key) => onToggleInlineTaskKey(task.id, key)}
+              actionsDisabled={isCompetitionClosed}
               t={t}
             />
           ))}
@@ -919,6 +963,7 @@ function RamadanTaskCard({
   selectedInlineTaskKeys,
   onToggleInlineTaskKey,
   t,
+  actionsDisabled,
   nightMode = false,
 }: {
   task: Task;
@@ -936,6 +981,7 @@ function RamadanTaskCard({
   selectedInlineTaskKeys: string[];
   onToggleInlineTaskKey: (key: string) => void;
   t: ReturnType<typeof useI18n>["t"];
+  actionsDisabled: boolean;
   nightMode?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1074,7 +1120,7 @@ function RamadanTaskCard({
                   : t("common.done")
           }
           onPress={onLog}
-          disabled={logging || completedToday || isAutoConditional}
+          disabled={logging || completedToday || isAutoConditional || actionsDisabled}
           style={styles.growButton}
         />
       </View>
@@ -1098,6 +1144,7 @@ function ModernTaskCard({
   selectedInlineTaskKeys,
   onToggleInlineTaskKey,
   t,
+  actionsDisabled,
 }: {
   task: Task;
   categoryLabel: string;
@@ -1114,6 +1161,7 @@ function ModernTaskCard({
   selectedInlineTaskKeys: string[];
   onToggleInlineTaskKey: (key: string) => void;
   t: ReturnType<typeof useI18n>["t"];
+  actionsDisabled: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const interactionKind = getTaskInteractionKind(task);
@@ -1219,7 +1267,7 @@ function ModernTaskCard({
                     : t("common.done")
             }
             onPress={onLog}
-            disabled={logging || completedToday || isAutoConditional}
+            disabled={logging || completedToday || isAutoConditional || actionsDisabled}
             style={styles.growButton}
           />
         </View>

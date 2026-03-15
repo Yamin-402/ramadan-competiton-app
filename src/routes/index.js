@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import healthRouter from "./health.js";
 import authRouter from "../modules/auth/auth.routes.js";
 import usersRouter from "../modules/users/users.routes.js";
@@ -13,6 +13,7 @@ import devicesRouter from "../modules/devices/devices.routes.js";
 import moneyRouter from "../modules/money/money.routes.js";
 import dailyQuestionsRouter from "../modules/daily-questions/daily-questions.routes.js";
 import adminRouter from "../modules/admin/admin.routes.js";
+import competitionRouter from "../modules/competition/competition.routes.js";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use("/notifications", notificationsRouter);
 router.use("/devices", devicesRouter);
 router.use("/money", moneyRouter);
 router.use("/daily-questions", dailyQuestionsRouter);
+router.use("/competition", competitionRouter);
 router.use("/admin", adminRouter);
 
 export default router;

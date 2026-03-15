@@ -35,6 +35,7 @@ interface TaskItemCardProps {
   inlineTasks?: Array<{ key: string; label: string }>;
   selectedInlineTaskKeys?: string[];
   onToggleInlineTaskKey?: (key: string) => void;
+  actionsDisabled?: boolean;
 }
 
 function getTypeLabel(task: Task, interactionKind: TaskInteractionKind, t: ReturnType<typeof useI18n>["t"]) {
@@ -66,6 +67,7 @@ export function TaskItemCard({
   inlineTasks = [],
   selectedInlineTaskKeys = [],
   onToggleInlineTaskKey,
+  actionsDisabled = false,
 }: TaskItemCardProps) {
   const { colors } = useAppTheme();
   const { t } = useI18n();
@@ -223,7 +225,7 @@ export function TaskItemCard({
                 : t("common.done")
         }
         onPress={onLog}
-        disabled={logging || completedToday || isAutoConditional}
+        disabled={logging || completedToday || isAutoConditional || actionsDisabled}
         variant={forbiddenStyle ? "danger" : "primary"}
       />
     </AppCard>

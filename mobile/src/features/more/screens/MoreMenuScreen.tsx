@@ -21,6 +21,7 @@ export function MoreMenuScreen({ navigation }: Props) {
   const menu = [
     { route: "Guide", label: t("more.guide"), icon: "help-circle-outline" },
     { route: "Leaderboard", label: t("more.leaderboard"), icon: "trophy-outline" },
+    { route: "CompetitionWinners", label: t("more.winners"), icon: "medal-outline" },
     { route: "Streaks", label: t("more.streaks"), icon: "flame-outline" },
     { route: "Notifications", label: t("more.notifications"), icon: "notifications-outline" },
     { route: "Money", label: t("more.money"), icon: "cash-outline" },

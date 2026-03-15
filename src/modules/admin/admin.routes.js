@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { asyncHandler } from "../../core/middleware/async-handler.js";
 import { requireAuth } from "../../core/middleware/require-auth.js";
-import { requireRole } from "../../core/middleware/require-role.js";
 import { loadAuthUser } from "../../core/middleware/load-auth-user.js";
+import { requireRole } from "../../core/middleware/require-role.js";
 import { requireAdminPermission } from "../../core/middleware/require-admin-permission.js";
 import {
   createAdminAccount,
@@ -19,6 +19,10 @@ import {
   generateMotivationNotifications,
   getAiAssistSettings,
   getLeaderboard,
+  getCompetitionState,
+  updateCompetitionState,
+  openCompetition,
+  closeCompetition,
   getScoringSettings,
   listCounters,
   listDailyQuestionAnswers,
@@ -106,6 +110,11 @@ router.patch(
   asyncHandler(reviewDailyQuestionAnswer)
 );
 router.get("/leaderboard", requireAdminPermission("LEADERBOARD"), asyncHandler(getLeaderboard));
+router.get("/competition", requireAdminPermission("COMPETITION"), asyncHandler(getCompetitionState));
+router.post("/competition/open", requireAdminPermission("COMPETITION"), asyncHandler(openCompetition));
+router.post("/competition/close", requireAdminPermission("COMPETITION"), asyncHandler(closeCompetition));
+router.patch("/competition", requireAdminPermission("COMPETITION"), asyncHandler(updateCompetitionState));
+
 router.get("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(getScoringSettings));
 router.patch("/settings/scoring", requireAdminPermission("TASKS"), asyncHandler(updateScoringSettings));
 router.get("/settings/ai-assist", requireAdminPermission("DAILY_QUESTIONS"), asyncHandler(getAiAssistSettings));
@@ -116,3 +125,4 @@ router.patch(
 );
 
 export default router;
+
