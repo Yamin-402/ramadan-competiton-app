@@ -355,7 +355,7 @@ export const adminApi = {
     });
   },
 
-  closeCompetition(payload?: { winners?: CompetitionWinner[]; showWinnersPopup?: boolean }) {
+  closeCompetition(payload?: { winners?: CompetitionWinner[]; showWinnersPopup?: boolean; revealDailyQuestions?: boolean }) {
     return requestData<CompetitionState>({
       method: "POST",
       url: "/admin/competition/close",

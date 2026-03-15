@@ -21,7 +21,7 @@ export function AppRoot() {
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
   const setTasksDesignVariant = useSettingsStore((state) => state.setTasksDesignVariant);
   const authHydrated = useAuthStore((state) => state.hydrated);
-  const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.user?.id);
   const loadCompetition = useCompetitionStore((state) => state.load);
   const clearCompetition = useCompetitionStore((state) => state.clear);
   const theme = useAppTheme();
@@ -41,15 +41,15 @@ export function AppRoot() {
     if (!authHydrated) {
       return;
     }
-    if (token) {
+    if (userId) {
       void loadCompetition();
     } else {
       clearCompetition();
     }
-  }, [authHydrated, token, loadCompetition, clearCompetition]);
+  }, [authHydrated, userId, loadCompetition, clearCompetition]);
 
   useEffect(() => {
-    if (!authHydrated || !token) {
+    if (!authHydrated || !userId) {
       return;
     }
 
@@ -60,7 +60,19 @@ export function AppRoot() {
     });
 
     return () => subscription.remove();
-  }, [authHydrated, loadCompetition, token]);
+  }, [authHydrated, loadCompetition, userId]);
+
+  useEffect(() => {
+    if (!authHydrated || !userId) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadCompetition();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [authHydrated, loadCompetition, userId]);
 
 
   if (!settingsHydrated) {

@@ -221,6 +221,7 @@ export const updateCompetitionStateSchema = z.object({
 
 export const closeCompetitionSchema = z.object({
   showWinnersPopup: z.boolean().optional(),
+  revealDailyQuestions: z.boolean().optional(),
   winners: z.array(competitionWinnerSchema).max(3).optional(),
 });
 export const generateMotivationNotificationsSchema = z.object({

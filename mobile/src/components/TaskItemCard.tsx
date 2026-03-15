@@ -86,6 +86,7 @@ export function TaskItemCard({
       style={{
         borderColor: forbiddenStyle ? colors.danger : colors.border,
         backgroundColor: forbiddenStyle ? colors.cardSoft : colors.card,
+        opacity: actionsDisabled ? 0.72 : 1,
       }}
     >
       <View style={styles.row}>
@@ -199,6 +200,12 @@ export function TaskItemCard({
         </View>
       ) : null}
 
+      {actionsDisabled ? (
+        <View style={[styles.disabledBanner, { borderColor: colors.border, backgroundColor: colors.cardSoft }]}>
+          <Text style={{ color: colors.textSecondary, fontWeight: "800" }}>{t("competition.closedTitle")}</Text>
+        </View>
+      ) : null}
+
       <FastingSelectionToggle value={fastingSelection} onChange={onFastingSelectionChange} />
 
       {showAmount ? (
@@ -260,6 +267,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     gap: 4,
+  },
+  disabledBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: "center",
   },
   chipsRow: {
     flexDirection: "row",

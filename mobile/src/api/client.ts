@@ -89,7 +89,7 @@ export function getApiErrorMessage(error: unknown, fallback = "Request failed"):
       return "Session expired. Please sign in again.";
     }
     if (status === 403) {
-      return "You do not have permission to perform this action.";
+      return apiError.response?.data?.error?.message || "You do not have permission to perform this action.";
     }
     if (status && status >= 500) {
       return "Server error. Please try again later.";

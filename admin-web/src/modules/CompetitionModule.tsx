@@ -24,6 +24,7 @@ export function CompetitionModule({ users }: Props) {
   const [search, setSearch] = useState("");
   const [allowedUserIds, setAllowedUserIds] = useState<number[]>([]);
   const [showWinnersPopup, setShowWinnersPopup] = useState(false);
+  const [revealDailyQuestions, setRevealDailyQuestions] = useState(true);
   const [winnerIds, setWinnerIds] = useState<number[]>([0, 0, 0]);
 
   const userOptions = useMemo(() => {
@@ -128,6 +129,7 @@ export function CompetitionModule({ users }: Props) {
       const payload = {
         winners: buildWinnerPayload(),
         showWinnersPopup: true,
+        revealDailyQuestions,
       };
       const data = await adminApi.closeCompetition(payload);
       setState(data);
@@ -159,6 +161,14 @@ export function CompetitionModule({ users }: Props) {
             {loading ? "Refreshing..." : "Refresh"}
           </button>
         </div>
+        <label className="checkbox-item" style={{ marginTop: 12 }}>
+          <input
+            type="checkbox"
+            checked={revealDailyQuestions}
+            onChange={() => setRevealDailyQuestions((prev) => !prev)}
+          />
+          <span>Reveal all daily question answers when closing</span>
+        </label>
         {state.closedAt ? (
           <p className="muted-text">Closed at: {new Date(state.closedAt).toLocaleString()}</p>
         ) : null}

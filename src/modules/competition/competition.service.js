@@ -144,6 +144,7 @@ export const competitionService = {
 
   async closeCompetition(payload = {}) {
     const current = await competitionService.getState();
+    const shouldRevealDailyQuestions = payload?.revealDailyQuestions !== false;
     let winners = Array.isArray(payload?.winners) && payload.winners.length > 0
       ? payload.winners.map((row, index) => normalizeWinner(row, index)).filter(Boolean)
       : await computeWinners();
@@ -159,7 +160,9 @@ export const competitionService = {
     };
 
     const updated = await competitionRepository.upsertState(next);
-    await dailyQuestionsService.revealAllAnswers();
+    if (shouldRevealDailyQuestions) {
+      await dailyQuestionsService.revealAllAnswers();
+    }
 
     return {
       ...normalizeCompetitionState(updated?.value),

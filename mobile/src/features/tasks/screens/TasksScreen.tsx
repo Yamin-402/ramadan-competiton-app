@@ -190,6 +190,7 @@ export function TasksScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingTaskId, setSubmittingTaskId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"success" | "error">("success");
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async (showLoader = true) => {
@@ -291,7 +292,8 @@ export function TasksScreen() {
     setError(null);
     setSuccessMessage(null);
     if (isCompetitionClosed) {
-      setError(t("competition.closedMessage"));
+      setToastTone("error");
+      setSuccessMessage(t("competition.closedMessage"));
       return;
     }
     const dailyLimit = getDailyCompletionLimit(task);
@@ -339,6 +341,7 @@ export function TasksScreen() {
             : undefined,
       });
       setTodayCompletionCountByTaskId((prev) => ({ ...prev, [task.id]: (prev[task.id] || 0) + 1 }));
+      setToastTone("success");
       setSuccessMessage(
         t("tasks.loggedPoints", {
           points: getSignedPointsLabel(activity.effectivePoints),
@@ -380,7 +383,7 @@ export function TasksScreen() {
   }, [streakByTaskId]);
 
   return (
-    <ScreenContainer fixedOverlay={successMessage ? <TopToast message={successMessage} tone="success" /> : null}>
+    <ScreenContainer fixedOverlay={successMessage ? <TopToast message={successMessage} tone={toastTone} /> : null}>
       {tasksDesignVariant === "classic" ? (
         <ClassicTasksView
           colors={colors}

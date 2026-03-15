@@ -59,6 +59,7 @@ export function ForbiddenTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingTaskId, setSubmittingTaskId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"success" | "error">("error");
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -119,7 +120,8 @@ export function ForbiddenTasksScreen() {
     setError(null);
     setSuccessMessage(null);
     if (isCompetitionClosed) {
-      setError(t("competition.closedMessage"));
+      setToastTone("error");
+      setSuccessMessage(t("competition.closedMessage"));
       return;
     }
     const dailyLimit = getDailyCompletionLimit(task);
@@ -157,6 +159,7 @@ export function ForbiddenTasksScreen() {
         isDuringFasting: toIsDuringFasting(fastingSelection),
       });
       setTodayCompletionCountByTaskId((prev) => ({ ...prev, [task.id]: (prev[task.id] || 0) + 1 }));
+      setToastTone("error");
       setSuccessMessage(
         t("tasks.loggedPoints", {
           points: getSignedPointsLabel(activity.effectivePoints),
@@ -179,7 +182,7 @@ export function ForbiddenTasksScreen() {
   };
 
   return (
-    <ScreenContainer fixedOverlay={successMessage ? <TopToast message={successMessage} tone="error" /> : null}>
+    <ScreenContainer fixedOverlay={successMessage ? <TopToast message={successMessage} tone={toastTone} /> : null}>
       <View style={[styles.warningBox, { borderColor: colors.warning, backgroundColor: colors.cardSoft }]}>
         <Text style={[styles.warningTitle, { color: colors.warning, textAlign }]}>
           {t("forbidden.title")}
