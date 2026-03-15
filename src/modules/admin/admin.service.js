@@ -1623,6 +1623,22 @@ export const adminService = {
       }
     }
 
+    if (finalized.length < query.limit && rawSuggestions.length > 0) {
+      for (const suggestion of rawSuggestions) {
+        if (finalized.length >= query.limit) {
+          break;
+        }
+        const normalized = normalizeSuggestionObject(
+          suggestion,
+          query.answerType,
+          suggestion
+        );
+        if (normalized) {
+          finalized.push(normalized);
+        }
+      }
+    }
+
     return finalized.slice(0, query.limit);
   },
 

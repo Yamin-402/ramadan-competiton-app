@@ -11,6 +11,8 @@ const config: ExpoConfig = {
   assetBundlePatterns: ["**/*"],
   updates: {
     enabled: false,
+    checkAutomatically: "NEVER",
+    fallbackToCacheTimeout: 0,
   },
   icon: "./assets/images/icon.png",
   ios: {
@@ -36,3 +38,4 @@ const config: ExpoConfig = {
 };
 
 export default config;
+
