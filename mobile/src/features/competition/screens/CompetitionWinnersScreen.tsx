@@ -28,8 +28,8 @@ function getRankTitle(rank: WinnerRank, isArabic: boolean) {
     if (rank === 2) return "المركز الثاني";
     return "المركز الثالث";
   }
-  if (rank === 1) return "Champion";
-  if (rank === 2) return "Runner-up";
+  if (rank === 1) return "1st Champion";
+  if (rank === 2) return "2nd place";
   return "Third place";
 }
 
