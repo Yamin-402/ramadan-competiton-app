@@ -70,10 +70,10 @@ function getRankTextColor(rank: WinnerRank, variant: TasksDesignVariant, mode: "
   return "#ffffff";
 }
 
-function useEntranceAnimation(delayMs: number) {
+function useEntranceAnimation(delayMs: number, startY = 18, startScale = 0.96) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
-  const scale = useRef(new Animated.Value(0.96)).current;
+  const translateY = useRef(new Animated.Value(startY)).current;
+  const scale = useRef(new Animated.Value(startScale)).current;
 
   useEffect(() => {
     const animation = Animated.sequence([
@@ -142,6 +142,117 @@ function useFloatAnimation(amplitude: number, durationMs: number, delayMs: numbe
   });
 }
 
+function usePulseAnimation(durationMs: number, delayMs: number) {
+  const value = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.delay(Math.max(0, delayMs)),
+        Animated.timing(value, {
+          toValue: 1,
+          duration: durationMs,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+        Animated.timing(value, {
+          toValue: 0,
+          duration: durationMs,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+      ])
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [delayMs, durationMs, value]);
+
+  return value;
+}
+
+function HeroSparkles({ color }: { color: string }) {
+  const a = usePulseAnimation(2400, 0);
+  const b = usePulseAnimation(2700, 320);
+  const c = usePulseAnimation(3000, 520);
+  const d = usePulseAnimation(2600, 780);
+  const e = usePulseAnimation(3200, 980);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={[
+          styles.heroSparkle,
+          {
+            top: 10,
+            left: 16,
+            opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.45] }),
+            transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="sparkles" size={18} color={color} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.heroSparkle,
+          {
+            top: 28,
+            right: 22,
+            opacity: b.interpolate({ inputRange: [0, 1], outputRange: [0.10, 0.38] }),
+            transform: [{ translateY: b.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="star" size={14} color={color} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.heroSparkle,
+          {
+            bottom: 18,
+            left: 40,
+            opacity: c.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.32] }),
+            transform: [{ translateY: c.interpolate({ inputRange: [0, 1], outputRange: [0, -9] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="star-outline" size={16} color={color} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.heroSparkle,
+          {
+            bottom: 34,
+            right: 46,
+            opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.10, 0.40] }),
+            transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="sparkles-outline" size={18} color={color} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.heroSparkle,
+          {
+            top: 54,
+            left: 140,
+            opacity: e.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.24] }),
+            transform: [{ translateY: e.interpolate({ inputRange: [0, 1], outputRange: [0, -7] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="ellipse" size={12} color={color} />
+      </Animated.View>
+    </View>
+  );
+}
+
 function WinnerAvatar({
   winner,
   rank,
@@ -189,18 +300,21 @@ function WinnerCard({
   winner,
   rank,
   large,
-  index,
 }: {
   winner: CompetitionWinner;
   rank: WinnerRank;
   large?: boolean;
-  index: number;
 }) {
   const { colors, mode } = useAppTheme();
   const variant = useSettingsStore((state) => state.tasksDesignVariant);
   const { t, isArabic } = useI18n();
-  const entrance = useEntranceAnimation(120 + index * 130);
-  const floatY = useFloatAnimation(large ? 10 : 7, large ? 2600 : 3000, 200 + index * 120);
+  const appearOrder = rank === 2 ? 0 : rank === 1 ? 1 : 2;
+  const entrance = useEntranceAnimation(
+    140 + appearOrder * 160,
+    rank === 1 ? (large ? 30 : 24) : 20,
+    rank === 1 ? 0.94 : 0.96
+  );
+  const floatY = useFloatAnimation(large ? 10 : 7, large ? 2600 : 3000, 240 + appearOrder * 160);
 
   const darkLike = mode === "dark" || variant === "ramadan_nights";
   const gradient = getRankGradient(rank, variant, mode);
@@ -410,6 +524,7 @@ export function CompetitionWinnersScreen() {
         end={{ x: 1, y: 1 }}
         style={[styles.hero, { borderColor: colors.border }]}
       >
+        <HeroSparkles color={accent} />
         <View style={[styles.heroTopRow, { flexDirection: isArabic ? "row-reverse" : "row" }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.heroTitle, { color: colors.textPrimary, textAlign }]}>
@@ -456,13 +571,13 @@ export function CompetitionWinnersScreen() {
 
       {competition && isClosed && winners.length > 0 ? (
         <>
-          {first ? <WinnerCard winner={first} rank={1} large index={0} /> : null}
+          {first ? <WinnerCard winner={first} rank={1} large /> : null}
           <View style={[styles.podiumRow, { flexDirection: isArabic ? "row-reverse" : "row" }]}>
             <View style={{ flex: 1 }}>
-              {second ? <WinnerCard winner={second} rank={2} index={1} /> : null}
+              {second ? <WinnerCard winner={second} rank={2} /> : null}
             </View>
             <View style={{ flex: 1 }}>
-              {third ? <WinnerCard winner={third} rank={3} index={2} /> : null}
+              {third ? <WinnerCard winner={third} rank={3} /> : null}
             </View>
           </View>
 
@@ -504,6 +619,10 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
     overflow: "hidden",
+  },
+  heroSparkle: {
+    position: "absolute",
+    zIndex: 0,
   },
   heroTopRow: {
     gap: 12,

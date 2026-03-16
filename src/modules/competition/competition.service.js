@@ -7,6 +7,36 @@ import {
   DEFAULT_COMPETITION_STATE,
 } from "./competition.constants.js";
 
+function toFiniteNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (typeof value === "object") {
+    if (typeof value.toNumber === "function") {
+      const parsed = value.toNumber();
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    if (typeof value.valueOf === "function") {
+      const parsed = Number(value.valueOf());
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizeWinner(raw, index) {
   if (!raw || typeof raw !== "object") {
     return null;
@@ -19,8 +49,7 @@ function normalizeWinner(raw, index) {
   const displayName = raw.displayName || raw.name || raw.email || `User ${userId}`;
   const avatarUrl = raw.avatarUrl || null;
   const totalPointsCandidate = raw.totalPoints ?? raw.points ?? raw.total;
-  const totalPointsParsed = Number(totalPointsCandidate);
-  const totalPoints = Number.isFinite(totalPointsParsed) ? totalPointsParsed : null;
+  const totalPoints = toFiniteNumber(totalPointsCandidate);
   return {
     userId,
     rank,
@@ -61,32 +90,46 @@ function isUserAllowed(state, userId) {
 async function computeWinners() {
   const rows = await adminRepository.getLeaderboardRows(10);
   const eligible = rows.filter((row) => row.user?.isLeaderboardVisible !== false);
-  return eligible.slice(0, 3).map((row, index) => ({
-    userId: row.user.id,
-    rank: index + 1,
-    displayName: row.user.displayName || row.user.email || `User ${row.user.id}`,
-    avatarUrl: row.user.avatarUrl || null,
-    totalPoints: row.totalPoints,
-  }));
+  return eligible
+    .slice(0, 3)
+    .map((row, index) =>
+      normalizeWinner(
+        {
+          userId: row.user.id,
+          rank: index + 1,
+          displayName: row.user.displayName || row.user.email || `User ${row.user.id}`,
+          avatarUrl: row.user.avatarUrl || null,
+          totalPoints: row.totalPoints,
+        },
+        index
+      )
+    )
+    .filter(Boolean);
 }
 
 async function hydrateWinnerPoints(winners) {
-  const missing = winners.filter((winner) => winner.totalPoints === null);
+  const missing = winners.filter((winner) => toFiniteNumber(winner.totalPoints) === null);
   if (missing.length === 0) {
-    return winners.map((winner) => ({ ...winner, totalPoints: winner.totalPoints ?? 0 }));
+    return winners.map((winner) => ({
+      ...winner,
+      totalPoints: toFiniteNumber(winner.totalPoints) ?? 0,
+    }));
   }
   const totals = await adminRepository.getTotalPointsByUserIds(missing.map((winner) => winner.userId));
   return winners.map((winner) => ({
     ...winner,
-    totalPoints: winner.totalPoints ?? totals.get(winner.userId) ?? 0,
+    totalPoints: toFiniteNumber(winner.totalPoints) ?? totals.get(winner.userId) ?? 0,
   }));
 }
 
 export const competitionService = {
   async getState() {
     const row = await competitionRepository.getState();
+    const normalized = normalizeCompetitionState(row?.value);
+    const winners = await hydrateWinnerPoints(normalized.winners);
     return {
-      ...normalizeCompetitionState(row?.value),
+      ...normalized,
+      winners,
       updatedAt: row?.updatedAt || null,
     };
   },

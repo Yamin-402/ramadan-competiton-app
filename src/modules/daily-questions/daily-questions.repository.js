@@ -112,7 +112,7 @@ export const dailyQuestionsRepository = {
 
       const answerIds = answers.map((answer) => answer.id);
 
-      await tx.dailyQuestionAnswer.updateMany({
+      const updateResult = await tx.dailyQuestionAnswer.updateMany({
         where: {
           id: { in: answerIds },
           isRevealed: false,
@@ -123,16 +123,44 @@ export const dailyQuestionsRepository = {
         },
       });
 
-      await tx.activity.createMany({
-        data: answers.map((answer) => ({
-          userId: answer.userId,
-          type: "DAILY_QUESTION_ANSWER",
-          occurredAt: revealedAt,
-          timezone,
-          isDuringFasting: false,
-          fastingMultiplier: 1,
-          basePoints: answer.awardedPoints,
-          effectivePoints: answer.awardedPoints,
+      if (updateResult.count === 0) {
+        return { revealedCount: 0 };
+      }
+
+      // Idempotency under concurrency:
+      // Only create activities for answers that were updated in THIS transaction (matching revealedAt).
+      const revealedNow = await tx.dailyQuestionAnswer.findMany({
+        where: {
+          id: { in: answerIds },
+          isRevealed: true,
+          revealedAt,
+        },
+        select: {
+          id: true,
+          userId: true,
+          questionId: true,
+          isCorrect: true,
+          awardedPoints: true,
+          question: {
+            select: {
+              questionText: true,
+              answerType: true,
+            },
+          },
+        },
+      });
+
+      if (revealedNow.length > 0) {
+        await tx.activity.createMany({
+          data: revealedNow.map((answer) => ({
+            userId: answer.userId,
+            type: "DAILY_QUESTION_ANSWER",
+            occurredAt: revealedAt,
+            timezone,
+            isDuringFasting: false,
+            fastingMultiplier: 1,
+            basePoints: answer.awardedPoints,
+            effectivePoints: answer.awardedPoints,
             note: "Daily question revealed",
             metadata: {
               questionId: answer.questionId,
@@ -141,9 +169,10 @@ export const dailyQuestionsRepository = {
               isCorrect: answer.isCorrect,
             },
           })),
-      });
+        });
+      }
 
-      return { revealedCount: answers.length };
+      return { revealedCount: revealedNow.length };
     });
   },
 };
