@@ -33,7 +33,8 @@ const en = {
 
   "competition.winnersTitle": "Competition Winners",
   "competition.winnersSubtitle": "May Allah accept from you all.",
-  "competition.points": "{points} pts",
+  "competition.points": "{{points}} pts",
+  "competition.viewWinners": "View winners",
   "competition.closedTitle": "Competition closed",
   "competition.closedMessage": "The competition is closed now. You can browse, but actions are disabled.",
   "competition.openMessage": "The competition is still open. Winners will appear after it closes.",
@@ -421,7 +422,8 @@ const ar: Record<keyof typeof en, string> = {
 
   "competition.winnersTitle": "الفائزون في المسابقة",
   "competition.winnersSubtitle": "تقبّل الله منكم جميعًا.",
-  "competition.points": "{points} نقطة",
+  "competition.points": "{{points}} نقطة",
+  "competition.viewWinners": "عرض صفحة الفائزين",
   "competition.closedTitle": "تم إغلاق المسابقة",
   "competition.closedMessage": "المسابقة مغلقة الآن. يمكنك التصفح فقط بدون تنفيذ مهام.",
   "competition.openMessage": "المسابقة ما زالت مفتوحة. سيتم إعلان الفائزين بعد الإغلاق.",

@@ -15,3 +15,16 @@ export function navigateToNotifications() {
     },
   } as never);
 }
+
+export function navigateToCompetitionWinners() {
+  if (!navigationRef.isReady()) {
+    return;
+  }
+
+  navigationRef.navigate("Main", {
+    screen: "MoreTab",
+    params: {
+      screen: "CompetitionWinners",
+    },
+  } as never);
+}

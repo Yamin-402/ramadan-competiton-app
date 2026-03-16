@@ -10,7 +10,6 @@ import { LoadingBlock } from "../components/LoadingBlock";
 import { useAppTheme } from "../hooks/use-app-theme";
 import { useI18n } from "../hooks/use-i18n";
 import { useSettingsStore } from "../store/settings-store";
-import { isRamadanActive } from "../utils/ramadan";
 import { RootNavigator } from "./navigation/RootNavigator";
 import { useAuthStore } from "../store/auth-store";
 import { useCompetitionStore } from "../store/competition-store";
@@ -19,23 +18,12 @@ import { navigationRef } from "./navigation/navigationRef";
 export function AppRoot() {
   const settingsHydrated = useSettingsStore((state) => state.hydrated);
   const tasksDesignVariant = useSettingsStore((state) => state.tasksDesignVariant);
-  const setTasksDesignVariant = useSettingsStore((state) => state.setTasksDesignVariant);
   const authHydrated = useAuthStore((state) => state.hydrated);
   const userId = useAuthStore((state) => state.user?.id);
   const loadCompetition = useCompetitionStore((state) => state.load);
   const clearCompetition = useCompetitionStore((state) => state.clear);
   const theme = useAppTheme();
   const { t, isArabic } = useI18n();
-
-  useEffect(() => {
-    if (!settingsHydrated) {
-      return;
-    }
-
-    if (isRamadanActive() && tasksDesignVariant === "classic") {
-      setTasksDesignVariant("ramadan_nights");
-    }
-  }, [settingsHydrated, setTasksDesignVariant, tasksDesignVariant]);
 
   useEffect(() => {
     if (!authHydrated) {
